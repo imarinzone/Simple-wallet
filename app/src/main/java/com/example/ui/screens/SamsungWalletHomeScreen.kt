@@ -4,12 +4,16 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -82,6 +86,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -91,6 +96,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -100,9 +106,12 @@ import com.example.security.HapticsHelper
 import com.example.ui.components.CreditCardItem
 import com.example.ui.components.LeatherFinish
 import com.example.ui.components.parseHexColor
+import com.example.ui.theme.CardMaterialYouTheme
+import com.example.ui.theme.MaterialYouThemeEngine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 /**
  * Minimal, hyper-clean Samsung Wallet & Google Wallet inspired home interface.
@@ -137,15 +146,17 @@ fun SamsungWalletHomeScreen(
 
     // Hardware back navigation handler: collapses stack or deselects card
     BackHandler(enabled = isVerticalStackMode || isCardSelected) {
-        haptics?.cardSelect()
         if (isVerticalStackMode) {
+            haptics?.stackCollapse()
             isVerticalStackMode = false
         } else {
+            haptics?.cardSelect()
             isCardSelected = false
         }
     }
 
     val pagerState = rememberPagerState(
+
 
 
         initialPage = 0,
@@ -164,8 +175,12 @@ fun SamsungWalletHomeScreen(
         null
     }
 
-    val primaryAccent = activeCard?.let { parseHexColor(it.themeColorHex, Color(0xFFE5A93C)) }
-        ?: Color(0xFFE5A93C)
+    val activeM3Theme = remember(activeCard?.themeColorHex, activeCard?.gradientEndHex) {
+        activeCard?.let { MaterialYouThemeEngine.generateTheme(it) }
+    }
+
+    val primaryAccent = activeM3Theme?.primary ?: Color(0xFFE5A93C)
+
 
     Box(
         modifier = modifier
@@ -203,10 +218,15 @@ fun SamsungWalletHomeScreen(
                                     else Color.White.copy(alpha = 0.12f)
                                 )
                                 .clickable {
-                                    haptics?.cardSelect()
+                                    if (!isVerticalStackMode) {
+                                        haptics?.stackExpand()
+                                    } else {
+                                        haptics?.stackCollapse()
+                                    }
                                     isVerticalStackMode = !isVerticalStackMode
                                 }
                                 .padding(horizontal = 9.dp, vertical = 4.dp)
+
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
@@ -337,120 +357,211 @@ fun SamsungWalletHomeScreen(
                             )
                         }
                     }
-                } else if (isVerticalStackMode) {
-                    // ================= ALL CARDS VERTICAL STACK (SAMSUNG WALLET STYLE) =================
-                    VerticalStackedCardsView(
-                        cards = cards,
-                        selectedIndex = pagerState.currentPage,
-                        onSelectCard = { index ->
-                            coroutineScope.launch {
-                                pagerState.scrollToPage(index)
-                            }
-                            isVerticalStackMode = false
-                            isCardSelected = true
-                        },
-                        onCollapseToCarousel = {
-                            isVerticalStackMode = false
-                        },
-                        haptics = haptics
-                    )
                 } else {
-                    var totalDragY by remember { mutableFloatStateOf(0f) }
+                    AnimatedContent(
+                        targetState = isVerticalStackMode,
+                        transitionSpec = {
+                            (fadeIn(tween(300)) + expandVertically(spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)))
+                                .togetherWith(fadeOut(tween(200)) + shrinkVertically(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)))
+                        },
+                        label = "WalletStackModeTransition"
+                    ) { inStackMode ->
+                        if (inStackMode) {
+                            // ================= ALL CARDS VERTICAL STACK (SAMSUNG WALLET STYLE) =================
+                            VerticalStackedCardsView(
+                                cards = cards,
+                                selectedIndex = pagerState.currentPage,
+                                onSelectCard = { index ->
+                                    haptics?.cardDraw()
+                                    coroutineScope.launch {
+                                        pagerState.scrollToPage(index)
+                                    }
+                                    isVerticalStackMode = false
+                                    isCardSelected = true
+                                },
+                                onCollapseToCarousel = {
+                                    haptics?.stackCollapse()
+                                    isVerticalStackMode = false
+                                },
+                                haptics = haptics
+                            )
+                        } else {
+                            // ================= HORIZONTAL CAROUSEL WITH PHYSICAL CARD DRAG-DOWN =================
+                            val cardDragOffset = remember { Animatable(0f) }
+                            var lastHapticMilestone by remember { mutableFloatStateOf(0f) }
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .pointerInput(Unit) {
-                                detectVerticalDragGestures(
-                                    onDragStart = { totalDragY = 0f },
-                                    onDragEnd = {
-                                        if (totalDragY > 40f) {
-                                            // Drag down detected! Expand to all cards stack!
-                                            haptics?.cardSlide()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .pointerInput(Unit) {
+                                        detectVerticalDragGestures(
+                                            onDragStart = {
+                                                lastHapticMilestone = 0f
+                                            },
+                                            onDragEnd = {
+                                                val currentOffset = cardDragOffset.value
+                                                if (currentOffset >= 48f) {
+                                                    // Dragged down past threshold! Open Samsung Wallet stack!
+                                                    haptics?.stackExpand()
+                                                    isVerticalStackMode = true
+                                                    coroutineScope.launch {
+                                                        cardDragOffset.snapTo(0f)
+                                                    }
+                                                } else {
+                                                    // Release before threshold: spring back to carousel
+                                                    coroutineScope.launch {
+                                                        cardDragOffset.animateTo(
+                                                            0f,
+                                                            spring(
+                                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                                stiffness = Spring.StiffnessLow
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                                lastHapticMilestone = 0f
+                                            },
+                                            onDragCancel = {
+                                                coroutineScope.launch {
+                                                    cardDragOffset.animateTo(0f)
+                                                }
+                                                lastHapticMilestone = 0f
+                                            },
+                                            onVerticalDrag = { change, dragAmount ->
+                                                if (dragAmount > 0f || cardDragOffset.value > 0f) {
+                                                    change.consume()
+                                                    val nextOffset = (cardDragOffset.value + dragAmount * 0.75f).coerceIn(0f, 160f)
+                                                    coroutineScope.launch {
+                                                        cardDragOffset.snapTo(nextOffset)
+                                                    }
+                                                    // Tactile physical resistance tick every 16px of pull
+                                                    if (nextOffset - lastHapticMilestone >= 16f) {
+                                                        haptics?.cardDragTick()
+                                                        lastHapticMilestone = nextOffset
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // Drag down hint affordance (Samsung Wallet quick handle)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            haptics?.stackExpand()
                                             isVerticalStackMode = true
                                         }
-                                        totalDragY = 0f
-                                    },
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        totalDragY += dragAmount
+                                        .padding(horizontal = 14.dp, vertical = 4.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Drag down to view stacked cards",
+                                            tint = if (cardDragOffset.value > 15f) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.55f),
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .offset(y = if (cardDragOffset.value > 10f) (cardDragOffset.value * 0.08f).dp else 0.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (cardDragOffset.value >= 48f) "Release to open card stack" else "Drag card down for stacked view",
+                                            color = if (cardDragOffset.value > 15f) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
                                     }
-                                )
-                            },
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Drag down hint affordance
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    haptics?.cardSlide()
-                                    isVerticalStackMode = true
                                 }
-                                .padding(horizontal = 14.dp, vertical = 4.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Drag down to view stacked cards",
-                                    tint = Color.White.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Drag down to view all cards stacked",
-                                    color = Color.White.copy(alpha = 0.5f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
 
-                        // ================= 3. HORIZONTAL CARD SLIDER =================
-                        HorizontalPager(
+                                // ================= 3. HORIZONTAL CARD SLIDER WITH INTERACTIVE PHYSICAL DRAG =================
+                                Box(
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    // Stack preview peeking cards behind active card while pulling down
+                                    if (cardDragOffset.value > 6f && cards.size > 1) {
+                                        val nextIndex = (pagerState.currentPage + 1) % cards.size
+                                        val nextCard = cards[nextIndex]
+                                        val peek1 = (cardDragOffset.value * 0.35f).roundToInt()
 
-                        state = pagerState,
-                        contentPadding = PaddingValues(horizontal = 32.dp),
-                        pageSpacing = 16.dp,
-                        modifier = Modifier.fillMaxWidth()
-                    ) { page ->
-                        val card = cards[page]
-                        val pageOffset = (
-                            (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-                        ).absoluteValue
+                                        if (cards.size > 2) {
+                                            val thirdIndex = (pagerState.currentPage + 2) % cards.size
+                                            val thirdCard = cards[thirdIndex]
+                                            val peek2 = (cardDragOffset.value * 0.65f).roundToInt()
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 42.dp)
+                                                    .offset { IntOffset(0, peek2) }
+                                                    .graphicsLayer {
+                                                        scaleX = 0.90f
+                                                        alpha = (cardDragOffset.value / 120f).coerceIn(0f, 0.6f)
+                                                    }
+                                            ) {
+                                                CreditCardItem(card = thirdCard, enableTiltSensor = false)
+                                            }
+                                        }
 
-                        val cardScale by animateFloatAsState(
-                            targetValue = if (pageOffset < 0.5f) 1f else 0.92f,
-                            animationSpec = spring(stiffness = 300f),
-                            label = "scale"
-                        )
-                        val cardAlpha by animateFloatAsState(
-                            targetValue = if (pageOffset < 0.5f) 1f else 0.7f,
-                            animationSpec = spring(stiffness = 300f),
-                            label = "alpha"
-                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 36.dp)
+                                                .offset { IntOffset(0, peek1) }
+                                                .graphicsLayer {
+                                                    scaleX = 0.95f
+                                                    alpha = (cardDragOffset.value / 90f).coerceIn(0f, 0.85f)
+                                                }
+                                        ) {
+                                            CreditCardItem(card = nextCard, enableTiltSensor = false)
+                                        }
+                                    }
 
-                        Box(
-                            modifier = Modifier
-                                .graphicsLayer {
-                                    scaleX = cardScale
-                                    scaleY = cardScale
-                                    alpha = cardAlpha
+                                    // Active front card carousel with physical offset
+                                    HorizontalPager(
+                                        state = pagerState,
+                                        contentPadding = PaddingValues(horizontal = 32.dp),
+                                        pageSpacing = 16.dp,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .offset { IntOffset(0, cardDragOffset.value.roundToInt()) }
+                                    ) { page ->
+                                        val card = cards[page]
+                                        val pageOffset = (
+                                            (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                        ).absoluteValue
+
+                                        val cardScale by animateFloatAsState(
+                                            targetValue = if (pageOffset < 0.5f) 1f else 0.92f,
+                                            animationSpec = spring(stiffness = 300f),
+                                            label = "scale"
+                                        )
+                                        val cardAlpha by animateFloatAsState(
+                                            targetValue = if (pageOffset < 0.5f) 1f else 0.7f,
+                                            animationSpec = spring(stiffness = 300f),
+                                            label = "alpha"
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .graphicsLayer {
+                                                    scaleX = cardScale
+                                                    scaleY = cardScale
+                                                    alpha = cardAlpha
+                                                }
+                                        ) {
+                                            CreditCardItem(
+                                                card = card,
+                                                haptics = haptics,
+                                                onCardClick = {
+                                                    haptics?.cardSelect()
+                                                    isCardSelected = !isCardSelected
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
-                        ) {
-                            CreditCardItem(
-                                card = card,
-                                haptics = haptics,
-                                onCardClick = {
-                                    haptics?.cardSelect()
-                                    isCardSelected = !isCardSelected
-                                }
-                            )
-                        }
-
-                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -470,7 +581,7 @@ fun SamsungWalletHomeScreen(
                                         .width(if (isSelected) 22.dp else 6.dp)
                                         .clip(CircleShape)
                                         .background(
-                                            if (isSelected) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.2f)
+                                            if (isSelected) (activeM3Theme?.primary ?: Color(0xFFE5A93C)) else Color.White.copy(alpha = 0.2f)
                                         )
                                 )
                             }
@@ -502,7 +613,7 @@ fun SamsungWalletHomeScreen(
                                             modifier = Modifier
                                                 .size(8.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0xFF10B981))
+                                                .background(activeM3Theme?.primary ?: Color(0xFF10B981))
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
@@ -518,7 +629,7 @@ fun SamsungWalletHomeScreen(
                                             haptics?.cardSelect()
                                             isCardSelected = false
                                         },
-                                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE5A93C))
+                                        colors = ButtonDefaults.textButtonColors(contentColor = activeM3Theme?.primary ?: Color(0xFFE5A93C))
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
@@ -552,8 +663,8 @@ fun SamsungWalletHomeScreen(
                                     .height(54.dp),
                                 shape = RoundedCornerShape(18.dp),
                                 colors = ButtonDefaults.elevatedButtonColors(
-                                    containerColor = if (isNfcPayingAnimation) Color(0xFF10B981) else Color(0xFFE5A93C),
-                                    contentColor = Color(0xFF1F1202)
+                                    containerColor = if (isNfcPayingAnimation) Color(0xFF10B981) else (activeM3Theme?.primary ?: Color(0xFFE5A93C)),
+                                    contentColor = activeM3Theme?.onPrimary ?: Color(0xFF1F1202)
                                 ),
                                 elevation = ButtonDefaults.elevatedButtonElevation(6.dp)
                             ) {
@@ -586,14 +697,14 @@ fun SamsungWalletHomeScreen(
                                     .height(54.dp),
                                 shape = RoundedCornerShape(18.dp),
                                 colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = Color(0xFF261F1A),
+                                    containerColor = activeM3Theme?.surfaceContainerHigh ?: Color(0xFF261F1A),
                                     contentColor = Color.White
                                 )
                             ) {
                                 Icon(
                                     imageVector = if (isCardRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                     contentDescription = "Show Details",
-                                    tint = Color(0xFFE5A93C),
+                                    tint = activeM3Theme?.primary ?: Color(0xFFE5A93C),
                                     modifier = Modifier.size(19.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -615,8 +726,8 @@ fun SamsungWalletHomeScreen(
                                 shape = RoundedCornerShape(18.dp),
                                 contentPadding = PaddingValues(0.dp),
                                 colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = Color(0xFF261F1A),
-                                    contentColor = if (activeCard.isFavorite) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.6f)
+                                    containerColor = activeM3Theme?.surfaceContainerHigh ?: Color(0xFF261F1A),
+                                    contentColor = if (activeCard.isFavorite) (activeM3Theme?.tertiary ?: Color(0xFFE5A93C)) else Color.White.copy(alpha = 0.6f)
                                 )
                             ) {
                                 Icon(
@@ -635,8 +746,8 @@ fun SamsungWalletHomeScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 24.dp)
                                 .clip(RoundedCornerShape(24.dp))
-                                .background(Color(0xFF1B1613))
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                                .background(activeM3Theme?.surfaceContainer ?: Color(0xFF1B1613))
+                                .border(1.dp, activeM3Theme?.outlineVariant ?: Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
                                 .padding(20.dp)
                         ) {
                             Column {
@@ -654,11 +765,12 @@ fun SamsungWalletHomeScreen(
                                         )
                                         Text(
                                             text = "${activeCard.bankOrIssuer} • ${activeCard.cardType}",
-                                            color = Color(0xFFE5A93C),
+                                            color = activeM3Theme?.primary ?: Color(0xFFE5A93C),
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
+
 
                                     // Copy number button
                                     IconButton(
@@ -829,6 +941,8 @@ fun SamsungWalletHomeScreen(
                 }
             }
         }
+    }
+}
 
 
 
@@ -939,24 +1053,34 @@ private fun VerticalStackedCardsView(
     modifier: Modifier = Modifier
 ) {
     var totalDragY by remember { mutableFloatStateOf(0f) }
+    var lastHapticMilestone by remember { mutableFloatStateOf(0f) }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
-                    onDragStart = { totalDragY = 0f },
+                    onDragStart = {
+                        totalDragY = 0f
+                        lastHapticMilestone = 0f
+                    },
                     onDragEnd = {
                         if (totalDragY < -40f) {
-                            // Swiped up: return to carousel!
-                            haptics?.cardSlide()
+                            // Swiped up: return to carousel with solid collapse thud!
+                            haptics?.stackCollapse()
                             onCollapseToCarousel()
                         }
                         totalDragY = 0f
+                        lastHapticMilestone = 0f
                     },
                     onVerticalDrag = { change, dragAmount ->
                         change.consume()
                         totalDragY += dragAmount
+                        // Subtle tactile tick as user drags up
+                        if (totalDragY < 0 && lastHapticMilestone - totalDragY >= 16f) {
+                            haptics?.cardDragTick()
+                            lastHapticMilestone = totalDragY
+                        }
                     }
                 )
             }
@@ -990,7 +1114,7 @@ private fun VerticalStackedCardsView(
 
             TextButton(
                 onClick = {
-                    haptics?.cardSelect()
+                    haptics?.stackCollapse()
                     onCollapseToCarousel()
                 },
                 colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE5A93C))
@@ -1008,8 +1132,8 @@ private fun VerticalStackedCardsView(
         Spacer(modifier = Modifier.height(6.dp))
 
         // Overlapping Stack of Cards (Samsung Wallet layout)
-        val stackItemSpacing = 70.dp
-        val totalStackHeight = 210.dp + ((cards.size - 1).coerceAtLeast(0) * 70).dp
+        val stackItemSpacing = 72.dp
+        val totalStackHeight = 210.dp + ((cards.size - 1).coerceAtLeast(0) * 72).dp
 
         Box(
             modifier = Modifier
@@ -1017,15 +1141,20 @@ private fun VerticalStackedCardsView(
                 .height(totalStackHeight)
         ) {
             cards.forEachIndexed { index, card ->
-                val topOffset = (index * 70).dp
+                val topOffset = (index * 72).dp
+                val isSelected = index == selectedIndex
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = topOffset)
                         .zIndex(index.toFloat())
+                        .shadow(
+                            elevation = if (isSelected) 14.dp else 8.dp,
+                            shape = RoundedCornerShape(18.dp)
+                        )
                         .clickable {
-                            haptics?.cardSelect()
+                            haptics?.cardDraw()
                             onSelectCard(index)
                         }
                 ) {
@@ -1034,13 +1163,43 @@ private fun VerticalStackedCardsView(
                         enableTiltSensor = true,
                         haptics = haptics,
                         onCardClick = {
-                            haptics?.cardSelect()
+                            haptics?.cardDraw()
                             onSelectCard(index)
                         }
                     )
+
+                    if (isSelected) {
+                        // Samsung Wallet "ACTIVE" card indicator badge
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 10.dp, end = 16.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFE5A93C).copy(alpha = 0.25f))
+                                .border(1.dp, Color(0xFFE5A93C).copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFE5A93C))
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "ACTIVE",
+                                    color = Color(0xFFE5A93C),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
+
 
         Spacer(modifier = Modifier.height(20.dp))
 

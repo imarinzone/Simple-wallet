@@ -73,7 +73,10 @@ import com.example.data.CardEntity
 import com.example.security.HapticsHelper
 import com.example.ui.components.CameraXCardScannerView
 import com.example.ui.components.CreditCardItem
+import com.example.ui.theme.BitmapPaletteExtractor
+import com.example.ui.theme.MaterialYouThemeEngine
 import kotlinx.coroutines.launch
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,6 +105,8 @@ fun ScanCardScreen(
     var bankOrIssuer by remember { mutableStateOf("") }
     var cardType by remember { mutableStateOf("VISA") }
     var selectedHex by remember { mutableStateOf("#1E293B") }
+    var secondaryHex by remember { mutableStateOf("#0F172A") }
+    var extractedSwatches by remember { mutableStateOf<List<String>>(emptyList()) }
 
     // Process image with Gemini 3.1 Pro
     fun processImage(bitmap: Bitmap) {
@@ -109,6 +114,12 @@ fun ScanCardScreen(
         isAnalyzing = true
         statusText = "Analyzing card structure using gemini-3.1-pro-preview..."
         haptics?.cardSlide()
+
+        // Extract Material You dynamic color palette from card photo
+        val extractedPalette = BitmapPaletteExtractor.extractPalette(bitmap)
+        selectedHex = extractedPalette.vibrantHex
+        secondaryHex = extractedPalette.secondaryHex
+        extractedSwatches = extractedPalette.suggestedSwatches
 
         coroutineScope.launch {
             val result = GeminiCardScannerService.analyzeCardImage(bitmap)
@@ -128,8 +139,14 @@ fun ScanCardScreen(
                     cvv = result.card.cvv
                     bankOrIssuer = result.card.bankOrIssuer
                     cardType = result.card.cardType
-                    selectedHex = result.card.themeColorHex
+                    if (result.card.themeColorHex.isNotBlank() && result.card.themeColorHex != "#1E293B") {
+                        selectedHex = result.card.themeColorHex
+                    }
+                    if (result.card.gradientEndHex.isNotBlank() && result.card.gradientEndHex != "#0F172A") {
+                        secondaryHex = result.card.gradientEndHex
+                    }
                 }
+
                 is ScanResult.Error -> {
                     haptics?.error()
                     statusText = "Analysis note: ${result.message}"

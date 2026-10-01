@@ -53,6 +53,8 @@ import com.example.data.CardEntity
 import com.example.security.HapticsHelper
 import com.example.ui.modifiers.rememberDeviceTiltState
 import com.example.ui.modifiers.sensor3DTilt
+import com.example.ui.theme.CardMaterialYouTheme
+import com.example.ui.theme.MaterialYouThemeEngine
 
 fun parseHexColor(hex: String, fallback: Color): Color {
 
@@ -90,18 +92,10 @@ fun CreditCardItem(
         label = "cardFlipAnimation"
     )
 
-    val baseColor = parseHexColor(card.themeColorHex, Color(0xFF1E293B))
-    val endColor = parseHexColor(card.gradientEndHex, Color(0xFF0F172A))
-
-    val cardBrush = Brush.linearGradient(
-        colors = listOf(
-            baseColor,
-            endColor,
-            baseColor.copy(alpha = 0.9f)
-        ),
-        start = Offset(0f, 0f),
-        end = Offset(800f, 500f)
-    )
+    // Generate complete Material You dynamic color theme from card palette
+    val m3Theme = remember(card.themeColorHex, card.gradientEndHex) {
+        MaterialYouThemeEngine.generateTheme(card)
+    }
 
     Box(
         modifier = modifier
@@ -111,7 +105,7 @@ fun CreditCardItem(
                 tiltState = tiltState,
                 maxTiltDegrees = 14f,
                 baseElevation = 14.dp,
-                shadowColor = Color.Black.copy(alpha = 0.45f),
+                shadowColor = m3Theme.ambientGlow,
                 cornerRadius = 18.dp
             )
             .clip(RoundedCornerShape(18.dp))
@@ -119,17 +113,10 @@ fun CreditCardItem(
                 rotationY = rotation
                 cameraDistance = 14f * density
             }
-            .background(cardBrush)
-
+            .background(m3Theme.cardGradient)
             .border(
                 width = 1.dp,
-                brush = Brush.linearGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        Color.Transparent,
-                        Color.White.copy(alpha = 0.15f)
-                    )
-                ),
+                brush = m3Theme.borderBrush,
                 shape = RoundedCornerShape(18.dp)
             )
             .clickable {
@@ -145,6 +132,7 @@ fun CreditCardItem(
             // FRONT OF CARD
             CardFrontContent(
                 card = card,
+                m3Theme = m3Theme,
                 onFlipRequest = {
                     haptics?.cardFlip()
                     isFlipped = true
@@ -159,6 +147,7 @@ fun CreditCardItem(
             ) {
                 CardBackContent(
                     card = card,
+                    m3Theme = m3Theme,
                     showFullCvv = showFullCvv,
                     onToggleCvv = {
                         haptics?.cardSelect()
@@ -181,6 +170,7 @@ fun CreditCardItem(
 @Composable
 private fun CardFrontContent(
     card: CardEntity,
+    m3Theme: CardMaterialYouTheme,
     onFlipRequest: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
@@ -211,8 +201,9 @@ private fun CardFrontContent(
                     if (card.bankOrIssuer.isNotBlank() && card.title != card.bankOrIssuer) {
                         Text(
                             text = card.title,
-                            color = Color.White.copy(alpha = 0.65f),
-                            fontSize = 11.sp
+                            color = m3Theme.primary.copy(alpha = 0.85f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -222,12 +213,12 @@ private fun CardFrontContent(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF0284C7).copy(alpha = 0.35f))
+                                .background(m3Theme.secondaryContainer.copy(alpha = 0.55f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "NFC ACTIVE",
-                                color = Color(0xFF7DD3FC),
+                                color = m3Theme.onSecondaryContainer,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -238,7 +229,7 @@ private fun CardFrontContent(
                     Icon(
                         imageVector = Icons.Default.Contactless,
                         contentDescription = "Contactless EMV",
-                        tint = Color.White.copy(alpha = 0.8f),
+                        tint = m3Theme.tertiary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -249,8 +240,11 @@ private fun CardFrontContent(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Gold Metallic EMV Chip
-                EmvChipView()
+                // Dynamic Metallic EMV Chip
+                EmvChipView(
+                    baseColor = m3Theme.chipBaseColor,
+                    detailColor = m3Theme.chipDetailColor
+                )
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(
                     text = card.maskedNumber,
@@ -311,6 +305,7 @@ private fun CardFrontContent(
 @Composable
 private fun CardBackContent(
     card: CardEntity,
+    m3Theme: CardMaterialYouTheme,
     showFullCvv: Boolean,
     onToggleCvv: () -> Unit,
     onCopyNumber: () -> Unit,
@@ -327,7 +322,7 @@ private fun CardBackContent(
                 .fillMaxWidth()
                 .height(38.dp)
                 .background(Color(0xFF0F0F11))
-                .border(width = 0.5.dp, color = Color.White.copy(alpha = 0.1f))
+                .border(width = 0.5.dp, color = m3Theme.outlineVariant)
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -359,24 +354,24 @@ private fun CardBackContent(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // CVV Box with toggle
+            // Dynamic Material You CVV Box with toggle
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color.White.copy(alpha = 0.15f))
+                    .background(m3Theme.tertiaryContainer)
                     .clickable { onToggleCvv() }
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "CVV: ",
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = m3Theme.onTertiaryContainer.copy(alpha = 0.75f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = if (showFullCvv) card.cvv.ifBlank { "•••" } else "•••",
-                    color = Color(0xFFFACC15),
+                    color = m3Theme.onTertiaryContainer,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
@@ -385,11 +380,12 @@ private fun CardBackContent(
                 Icon(
                     imageVector = if (showFullCvv) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                     contentDescription = "Toggle CVV",
-                    tint = Color.White.copy(alpha = 0.8f),
+                    tint = m3Theme.onTertiaryContainer.copy(alpha = 0.85f),
                     modifier = Modifier.size(16.dp)
                 )
             }
         }
+
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -434,7 +430,11 @@ private fun CardBackContent(
 }
 
 @Composable
-fun EmvChipView(modifier: Modifier = Modifier) {
+fun EmvChipView(
+    modifier: Modifier = Modifier,
+    baseColor: Color = Color(0xFFFDE68A),
+    detailColor: Color = Color(0xFFD97706)
+) {
     Box(
         modifier = modifier
             .size(width = 38.dp, height = 28.dp)
@@ -442,33 +442,32 @@ fun EmvChipView(modifier: Modifier = Modifier) {
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFFFDE68A),
-                        Color(0xFFD97706),
-                        Color(0xFFF59E0B)
+                        baseColor,
+                        detailColor,
+                        baseColor.copy(alpha = 0.85f)
                     )
                 )
             )
-            .border(0.5.dp, Color(0xFF92400E), RoundedCornerShape(6.dp))
+            .border(0.5.dp, detailColor.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
             .padding(2.dp)
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = 1f
-            val chipColor = Color(0xFF78350F)
             // Chip internal division circuit lines
             drawLine(
-                chipColor,
+                detailColor,
                 Offset(size.width * 0.35f, 0f),
                 Offset(size.width * 0.35f, size.height),
                 strokeWidth
             )
             drawLine(
-                chipColor,
+                detailColor,
                 Offset(size.width * 0.65f, 0f),
                 Offset(size.width * 0.65f, size.height),
                 strokeWidth
             )
             drawLine(
-                chipColor,
+                detailColor,
                 Offset(0f, size.height * 0.5f),
                 Offset(size.width, size.height * 0.5f),
                 strokeWidth
@@ -476,6 +475,7 @@ fun EmvChipView(modifier: Modifier = Modifier) {
         }
     }
 }
+
 
 @Composable
 fun CardNetworkLogoBadge(cardType: String, modifier: Modifier = Modifier) {

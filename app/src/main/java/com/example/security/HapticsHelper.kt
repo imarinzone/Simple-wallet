@@ -29,7 +29,76 @@ class HapticsHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Subtle micro-tick during active finger dragging to simulate physical resistance
+     */
+    fun cardDragTick() {
+        if (vibrator?.hasVibrator() == true) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(8)
+            }
+        }
+    }
+
+    /**
+     * Tactile cascading cards-ruffle effect when cards fan out into the stack
+     */
+    fun stackExpand() {
+        if (vibrator?.hasVibrator() == true) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Rising triple-tick ruffle waveform mimicking physical plastic cards fanning out
+                val timings = longArrayOf(0, 10, 22, 14, 25, 20)
+                val amplitudes = intArrayOf(0, 75, 0, 140, 0, 220)
+                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(longArrayOf(0, 12, 20, 18), -1)
+            }
+        }
+    }
+
+    /**
+     * Firm, damped thud when the card stack collapses flush back into the slot
+     */
+    fun stackCollapse() {
+        if (vibrator?.hasVibrator() == true) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Damped contact followed by solid slot seat
+                val timings = longArrayOf(0, 14, 26, 30)
+                val amplitudes = intArrayOf(0, 110, 0, 190)
+                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(35)
+            }
+        }
+    }
+
+    /**
+     * Snappy "drawn from wallet" sensation when picking an individual card
+     */
+    fun cardDraw() {
+        if (vibrator?.hasVibrator() == true) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val timings = longArrayOf(0, 10, 20, 22)
+                val amplitudes = intArrayOf(0, 95, 0, 210)
+                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(25)
+            }
+        }
+    }
+
     fun cardSelect() {
+
         if (vibrator?.hasVibrator() == true) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))

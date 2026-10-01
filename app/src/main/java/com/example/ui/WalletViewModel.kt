@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.AppDatabase
@@ -30,6 +31,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val database = AppDatabase.getInstance(application)
     val repository = WalletRepository(database.cardDao())
     val haptics = HapticsHelper(application)
+    private val prefs = application.getSharedPreferences("wallet_security_prefs", Context.MODE_PRIVATE)
 
     val cards: StateFlow<List<CardEntity>> = repository.allCards
         .stateIn(
@@ -47,13 +49,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _selectedCardForDetail = MutableStateFlow<CardEntity?>(null)
     val selectedCardForDetail: StateFlow<CardEntity?> = _selectedCardForDetail.asStateFlow()
 
-    private val _isLocked = MutableStateFlow(true)
-    val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
-
-    private val _isBiometricEnabled = MutableStateFlow(true)
+    // Finger lock and app lock are strictly OPT-IN (default false). App does not start locked.
+    private val _isBiometricEnabled = MutableStateFlow(prefs.getBoolean("pref_biometric_enabled", false))
     val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
 
-    private val _masterPin = MutableStateFlow("1234")
+    private val _isLocked = MutableStateFlow(false)
+    val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
+
+    private val _hasSuggestedLock = MutableStateFlow(prefs.getBoolean("pref_has_suggested_lock", false))
+    val hasSuggestedLock: StateFlow<Boolean> = _hasSuggestedLock.asStateFlow()
+
+    // Show suggestion only when app is loaded for the very first time and lock is not yet enabled
+    private val _showLockSuggestionDialog = MutableStateFlow(!_hasSuggestedLock.value && !_isBiometricEnabled.value)
+    val showLockSuggestionDialog: StateFlow<Boolean> = _showLockSuggestionDialog.asStateFlow()
+
+    private val _masterPin = MutableStateFlow(prefs.getString("pref_master_pin", "1234") ?: "1234")
     val masterPin: StateFlow<String> = _masterPin.asStateFlow()
 
     private val _themeMode = MutableStateFlow(ThemeMode.DARK)
@@ -107,8 +117,25 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun lockWallet() {
-        _isLocked.value = true
-        _isWalletOpen.value = false
+        if (_isBiometricEnabled.value) {
+            _isLocked.value = true
+            _isWalletOpen.value = false
+        }
+    }
+
+    fun dismissLockSuggestion() {
+        _showLockSuggestionDialog.value = false
+        _hasSuggestedLock.value = true
+        prefs.edit().putBoolean("pref_has_suggested_lock", true).apply()
+    }
+
+    fun enableLockFromSuggestion() {
+        _isBiometricEnabled.value = true
+        prefs.edit().putBoolean("pref_biometric_enabled", true).apply()
+        _showLockSuggestionDialog.value = false
+        _hasSuggestedLock.value = true
+        prefs.edit().putBoolean("pref_has_suggested_lock", true).apply()
+        haptics.success()
     }
 
     fun saveCard(card: CardEntity) {
@@ -145,6 +172,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleBiometricEnabled(enabled: Boolean) {
         _isBiometricEnabled.value = enabled
+        prefs.edit().putBoolean("pref_biometric_enabled", enabled).apply()
         if (!enabled) {
             _isLocked.value = false
         }
@@ -152,6 +180,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setMasterPin(pin: String) {
         _masterPin.value = pin
+        prefs.edit().putString("pref_master_pin", pin).apply()
     }
 
     fun toggleHaptics(enabled: Boolean) {

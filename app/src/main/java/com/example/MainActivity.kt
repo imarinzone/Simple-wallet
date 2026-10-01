@@ -13,11 +13,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -25,6 +30,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -145,6 +151,7 @@ fun MainAppContent(
     val leatherFinish by viewModel.leatherFinish.collectAsState()
     val isHapticsEnabled by viewModel.isHapticsEnabled.collectAsState()
     val scannedPhysicalCard by viewModel.scannedPhysicalCard.collectAsState()
+    val showLockSuggestionDialog by viewModel.showLockSuggestionDialog.collectAsState()
 
     var showAddCardChooser by remember { mutableStateOf(false) }
     var biometricErrorMessage by remember { mutableStateOf<String?>(null) }
@@ -287,6 +294,68 @@ fun MainAppContent(
                         viewModel.dismissPhysicalNfcCardPrompt()
                     },
                     haptics = haptics
+                )
+            }
+
+            // First-load opt-in suggestion dialog: suggest setting up lock
+            if (showLockSuggestionDialog) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.dismissLockSuggestion() },
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE5A93C).copy(alpha = 0.18f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Fingerprint,
+                                contentDescription = null,
+                                tint = Color(0xFFE5A93C),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = "Add Fingerprint or App Lock?",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "Keep your payment cards and digital wallet safe. You can secure VaultFolio with your device's fingerprint or PIN. Lock is completely optional and can be turned on or off anytime in Settings.",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.enableLockFromSuggestion()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFE5A93C),
+                                contentColor = Color(0xFF1E1002)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Turn On Lock", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { viewModel.dismissLockSuggestion() }
+                        ) {
+                            Text("Not Now", color = Color.White.copy(alpha = 0.65f))
+                        }
+                    },
+                    containerColor = Color(0xFF1E1A17),
+                    shape = RoundedCornerShape(22.dp)
                 )
             }
         }
