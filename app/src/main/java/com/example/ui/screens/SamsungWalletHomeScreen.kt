@@ -1,15 +1,19 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,11 +38,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contactless
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
+
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Palette
@@ -64,6 +74,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,6 +85,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -81,6 +93,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+
 import com.example.data.CardEntity
 import com.example.security.HapticsHelper
 import com.example.ui.components.CreditCardItem
@@ -118,8 +132,22 @@ fun SamsungWalletHomeScreen(
     var cardToDelete by remember { mutableStateOf<CardEntity?>(null) }
     var isCardRevealed by remember { mutableStateOf(false) }
     var isNfcPayingAnimation by remember { mutableStateOf(false) }
+    var isCardSelected by remember { mutableStateOf(false) }
+    var isVerticalStackMode by remember { mutableStateOf(false) }
+
+    // Hardware back navigation handler: collapses stack or deselects card
+    BackHandler(enabled = isVerticalStackMode || isCardSelected) {
+        haptics?.cardSelect()
+        if (isVerticalStackMode) {
+            isVerticalStackMode = false
+        } else {
+            isCardSelected = false
+        }
+    }
 
     val pagerState = rememberPagerState(
+
+
         initialPage = 0,
         pageCount = { cards.size.coerceAtLeast(1) }
     )
@@ -170,17 +198,34 @@ fun SamsungWalletHomeScreen(
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.12f))
-                                .padding(horizontal = 9.dp, vertical = 3.dp)
+                                .background(
+                                    if (isVerticalStackMode) Color(0xFFE5A93C).copy(alpha = 0.25f)
+                                    else Color.White.copy(alpha = 0.12f)
+                                )
+                                .clickable {
+                                    haptics?.cardSelect()
+                                    isVerticalStackMode = !isVerticalStackMode
+                                }
+                                .padding(horizontal = 9.dp, vertical = 4.dp)
                         ) {
-                            Text(
-                                text = "${pagerState.currentPage + 1}/${cards.size}",
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isVerticalStackMode) Icons.Default.KeyboardArrowUp else Icons.Default.Layers,
+                                    contentDescription = "Toggle Stack",
+                                    tint = if (isVerticalStackMode) Color(0xFFE5A93C) else Color.White,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isVerticalStackMode) "Stack" else "${pagerState.currentPage + 1}/${cards.size}",
+                                    color = if (isVerticalStackMode) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.85f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
+
                 }
 
                 // Top right 3-dots overflow menu
@@ -292,11 +337,80 @@ fun SamsungWalletHomeScreen(
                             )
                         }
                     }
+                } else if (isVerticalStackMode) {
+                    // ================= ALL CARDS VERTICAL STACK (SAMSUNG WALLET STYLE) =================
+                    VerticalStackedCardsView(
+                        cards = cards,
+                        selectedIndex = pagerState.currentPage,
+                        onSelectCard = { index ->
+                            coroutineScope.launch {
+                                pagerState.scrollToPage(index)
+                            }
+                            isVerticalStackMode = false
+                            isCardSelected = true
+                        },
+                        onCollapseToCarousel = {
+                            isVerticalStackMode = false
+                        },
+                        haptics = haptics
+                    )
                 } else {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    var totalDragY by remember { mutableFloatStateOf(0f) }
 
-                    // ================= 3. HORIZONTAL CARD SLIDER =================
-                    HorizontalPager(
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onDragStart = { totalDragY = 0f },
+                                    onDragEnd = {
+                                        if (totalDragY > 40f) {
+                                            // Drag down detected! Expand to all cards stack!
+                                            haptics?.cardSlide()
+                                            isVerticalStackMode = true
+                                        }
+                                        totalDragY = 0f
+                                    },
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        totalDragY += dragAmount
+                                    }
+                                )
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Drag down hint affordance
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    haptics?.cardSlide()
+                                    isVerticalStackMode = true
+                                }
+                                .padding(horizontal = 14.dp, vertical = 4.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Drag down to view stacked cards",
+                                    tint = Color.White.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Drag down to view all cards stacked",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // ================= 3. HORIZONTAL CARD SLIDER =================
+                        HorizontalPager(
+
                         state = pagerState,
                         contentPadding = PaddingValues(horizontal = 32.dp),
                         pageSpacing = 16.dp,
@@ -328,9 +442,14 @@ fun SamsungWalletHomeScreen(
                         ) {
                             CreditCardItem(
                                 card = card,
-                                haptics = haptics
+                                haptics = haptics,
+                                onCardClick = {
+                                    haptics?.cardSelect()
+                                    isCardSelected = !isCardSelected
+                                }
                             )
                         }
+
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -361,14 +480,63 @@ fun SamsungWalletHomeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // ================= 4. MATERIAL EXPRESSIVE BIG ACTION BUTTONS =================
-                    if (activeCard != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
+                    // ================= 4. MATERIAL EXPRESSIVE DETAILS (SHOWN ONLY WHEN A CARD IS SELECTED) =================
+                    AnimatedVisibility(
+                        visible = isCardSelected && activeCard != null,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        if (activeCard != null) {
+                            Column {
+                                // Selected Card Status Pill & Collapse button
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 24.dp)
+                                        .padding(bottom = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF10B981))
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Card Selected",
+                                            color = Color.White.copy(alpha = 0.85f),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    TextButton(
+                                        onClick = {
+                                            haptics?.cardSelect()
+                                            isCardSelected = false
+                                        },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE5A93C))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Collapse",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Collapse", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 24.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+
                             // Primary Contactless Pay Button
                             ElevatedButton(
                                 onClick = {
@@ -613,9 +781,56 @@ fun SamsungWalletHomeScreen(
                         }
 
                         Spacer(modifier = Modifier.height(20.dp))
+                            }
+                        }
+                    }
+
+                    // Stack mode prompt when no card is selected
+                    if (!isCardSelected && cards.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(28.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color.White.copy(alpha = 0.06f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+                                    .clickable {
+                                        haptics?.cardSelect()
+                                        isCardSelected = true
+                                    }
+                                    .padding(horizontal = 20.dp, vertical = 11.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CreditCard,
+                                        contentDescription = null,
+                                        tint = Color(0xFFE5A93C),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Tap card to select & get details",
+                                        color = Color.White.copy(alpha = 0.75f),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
+        }
+
+
 
             // ================= 6. BOTTOM BAR: SHOW ONLY THE ADD BUTTON =================
             Surface(
@@ -709,3 +924,140 @@ fun SamsungWalletHomeScreen(
         }
     }
 }
+
+/**
+ * Samsung Wallet style vertical stacked cards view where cards overlap
+ * and users can see all cards stacked on top of each other.
+ */
+@Composable
+private fun VerticalStackedCardsView(
+    cards: List<CardEntity>,
+    selectedIndex: Int,
+    onSelectCard: (Int) -> Unit,
+    onCollapseToCarousel: () -> Unit,
+    haptics: HapticsHelper? = null,
+    modifier: Modifier = Modifier
+) {
+    var totalDragY by remember { mutableFloatStateOf(0f) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { totalDragY = 0f },
+                    onDragEnd = {
+                        if (totalDragY < -40f) {
+                            // Swiped up: return to carousel!
+                            haptics?.cardSlide()
+                            onCollapseToCarousel()
+                        }
+                        totalDragY = 0f
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        totalDragY += dragAmount
+                    }
+                )
+            }
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Stack Mode Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Layers,
+                    contentDescription = null,
+                    tint = Color(0xFFE5A93C),
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "ALL CARDS STACK (${cards.size})",
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            TextButton(
+                onClick = {
+                    haptics?.cardSelect()
+                    onCollapseToCarousel()
+                },
+                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE5A93C))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowUp,
+                    contentDescription = "Carousel View",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Carousel View", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Overlapping Stack of Cards (Samsung Wallet layout)
+        val stackItemSpacing = 70.dp
+        val totalStackHeight = 210.dp + ((cards.size - 1).coerceAtLeast(0) * 70).dp
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(totalStackHeight)
+        ) {
+            cards.forEachIndexed { index, card ->
+                val topOffset = (index * 70).dp
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = topOffset)
+                        .zIndex(index.toFloat())
+                        .clickable {
+                            haptics?.cardSelect()
+                            onSelectCard(index)
+                        }
+                ) {
+                    CreditCardItem(
+                        card = card,
+                        enableTiltSensor = true,
+                        haptics = haptics,
+                        onCardClick = {
+                            haptics?.cardSelect()
+                            onSelectCard(index)
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Bottom instruction
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White.copy(alpha = 0.06f))
+                .padding(horizontal = 18.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "Tap any card to select • Drag up to collapse",
+                color = Color.White.copy(alpha = 0.65f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
