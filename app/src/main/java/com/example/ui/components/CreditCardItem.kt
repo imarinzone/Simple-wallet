@@ -51,8 +51,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CardEntity
 import com.example.security.HapticsHelper
+import com.example.ui.modifiers.rememberDeviceTiltState
+import com.example.ui.modifiers.sensor3DTilt
 
 fun parseHexColor(hex: String, fallback: Color): Color {
+
     return try {
         val clean = hex.removePrefix("#")
         if (clean.length == 6) {
@@ -71,11 +74,15 @@ fun CreditCardItem(
     modifier: Modifier = Modifier,
     haptics: HapticsHelper? = null,
     isFlippedInitial: Boolean = false,
+    enableTiltSensor: Boolean = true,
     onCardClick: (() -> Unit)? = null
 ) {
     var isFlipped by remember { mutableStateOf(isFlippedInitial) }
     var showFullCvv by remember { mutableStateOf(false) }
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
+
+    // Real hardware device orientation sensor
+    val tiltState by rememberDeviceTiltState(enabled = enableTiltSensor)
 
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
@@ -100,11 +107,12 @@ fun CreditCardItem(
         modifier = modifier
             .fillMaxWidth()
             .height(210.dp)
-            .shadow(
-                elevation = 14.dp,
-                shape = RoundedCornerShape(18.dp),
-                ambientColor = Color.Black.copy(alpha = 0.4f),
-                spotColor = baseColor.copy(alpha = 0.6f)
+            .sensor3DTilt(
+                tiltState = tiltState,
+                maxTiltDegrees = 14f,
+                baseElevation = 14.dp,
+                shadowColor = Color.Black.copy(alpha = 0.45f),
+                cornerRadius = 18.dp
             )
             .clip(RoundedCornerShape(18.dp))
             .graphicsLayer {
@@ -112,6 +120,7 @@ fun CreditCardItem(
                 cameraDistance = 14f * density
             }
             .background(cardBrush)
+
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
