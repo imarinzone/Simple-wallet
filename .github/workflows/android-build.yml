@@ -27,11 +27,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           cache: 'gradle'
 
       - name: Grant execute permission for gradlew
@@ -46,25 +46,33 @@ jobs:
             touch .env
           fi
 
-          # Decode debug keystore if present for consistent APK signing
+          # Decode debug keystore if base64 file exists
           if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
             base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
 
+          # If debug.keystore is still missing or empty, generate a valid one with keytool
+          if [ ! -f debug.keystore ] || [ ! -s debug.keystore ]; then
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       - name: Build APKs with Gradle
-        run: ./gradlew assembleDebug assembleRelease --stacktrace
+        run: ./gradlew assembleDebug assembleRelease --no-daemon --stacktrace
 
       - name: Organize Output APKs
         id: apks
         run: |
           mkdir -p release-apks
-          # Copy debug APK (pre-signed, directly installable on any Android device)
+          # Copy any built APKs
+          find app/build/outputs/apk/ -name "*.apk" -type f -exec cp {} release-apks/ \;
+          # Friendly named APK copies
           if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
             cp app/build/outputs/apk/debug/app-debug.apk release-apks/VaultFolio-debug.apk
           fi
-          # Copy release APK
-          find app/build/outputs/apk/release -name "*.apk" -exec cp {} release-apks/ \; 2>/dev/null || true
-          echo "Generated APK files:"
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk release-apks/VaultFolio-release.apk
+          fi
+          echo "Generated APK files in release-apks:"
           ls -la release-apks/
 
       - name: Upload APKs as Workflow Artifact
@@ -72,10 +80,12 @@ jobs:
         with:
           name: VaultFolio-APKs
           path: release-apks/*.apk
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Publish APK to GitHub Release
-        if: github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        if: success() && (github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           files: release-apks/*.apk
