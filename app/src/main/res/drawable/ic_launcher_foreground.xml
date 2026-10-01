@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Back Silver/Titanium Card sliding out -->
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M37,32h34c2.2,0 4,1.8 4,4v22h-42v-22c0,-2.2 1.8,-4 4,-4z" />
+    <path
+        android:fillColor="#CBD5E1"
+        android:pathData="M40,36h12v3h-12z" />
+
+    <!-- Front Gold Card sliding out -->
+    <path
+        android:fillColor="#E5A93C"
+        android:pathData="M33,39h42c2.2,0 4,1.8 4,4v22h-50v-22c0,-2.2 1.8,-4 4,-4z" />
+    <!-- Gold Card Chip & Stripe -->
+    <path
+        android:fillColor="#FDE68A"
+        android:pathData="M38,44h9v7h-9z" />
+    <path
+        android:fillColor="#B47818"
+        android:pathData="M52,47h20v2h-20z" />
+
+    <!-- Main Leather Wallet Body -->
+    <path
+        android:fillColor="#3D291D"
+        android:pathData="M27,48h54c2.76,0 5,2.24 5,5v26c0,2.76 -2.24,5 -5,5h-54c-2.76,0 -5,-2.24 -5,-5v-26c0,-2.76 2.24,-5 5,-5z" />
+
+    <!-- Leather Front Pocket Cut / Curved Flap -->
+    <path
+        android:fillColor="#5A3A26"
+        android:pathData="M22,58c0,0 12,6 32,6s32,-6 32,-6v16c0,2.76 -2.24,5 -5,5h-54c-2.76,0 -5,-2.24 -5,-5v-16z" />
+
+    <!-- Wallet Stitching Accent -->
+    <path
+        android:strokeColor="#C89758"
+        android:strokeWidth="1"
+        android:pathData="M25,52h58v28h-58z" />
+
+    <!-- Golden Security Shield Clasp with Biometric Core -->
+    <path
+        android:fillColor="#F5D485"
+        android:pathData="M54,61c-4,0 -8,2 -8,6c0,5 8,10 8,10s8,-5 8,-10c0,-4 -4,-6 -8,-6z" />
+    <path
+        android:fillColor="#784518"
+        android:pathData="M54,64c-1.5,0 -2.5,1 -2.5,2.5c0,1.2 0.8,2.2 1.8,2.4v2.1h1.4v-2.1c1,-0.2 1.8,-1.2 1.8,-2.4c0,-1.5 -1,-2.5 -2.5,-2.5z" />
+</vector>

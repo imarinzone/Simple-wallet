@@ -1,0 +1,7 @@
+{
+  "name": "VaultFolio",
+  "description": "Secure tactile leather wallet with biometric lock, card scanning via NFC & Gemini AI OCR, 3D card physics, and encrypted sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

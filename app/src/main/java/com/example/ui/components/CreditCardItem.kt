@@ -1,0 +1,578 @@
+package com.example.ui.components
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Contactless
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.CardEntity
+import com.example.security.HapticsHelper
+
+fun parseHexColor(hex: String, fallback: Color): Color {
+    return try {
+        val clean = hex.removePrefix("#")
+        if (clean.length == 6) {
+            Color(android.graphics.Color.parseColor("#$clean"))
+        } else if (clean.length == 8) {
+            Color(android.graphics.Color.parseColor("#$clean"))
+        } else fallback
+    } catch (e: Exception) {
+        fallback
+    }
+}
+
+@Composable
+fun CreditCardItem(
+    card: CardEntity,
+    modifier: Modifier = Modifier,
+    haptics: HapticsHelper? = null,
+    isFlippedInitial: Boolean = false,
+    onCardClick: (() -> Unit)? = null
+) {
+    var isFlipped by remember { mutableStateOf(isFlippedInitial) }
+    var showFullCvv by remember { mutableStateOf(false) }
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
+
+    val rotation by animateFloatAsState(
+        targetValue = if (isFlipped) 180f else 0f,
+        animationSpec = tween(durationMillis = 500),
+        label = "cardFlipAnimation"
+    )
+
+    val baseColor = parseHexColor(card.themeColorHex, Color(0xFF1E293B))
+    val endColor = parseHexColor(card.gradientEndHex, Color(0xFF0F172A))
+
+    val cardBrush = Brush.linearGradient(
+        colors = listOf(
+            baseColor,
+            endColor,
+            baseColor.copy(alpha = 0.9f)
+        ),
+        start = Offset(0f, 0f),
+        end = Offset(800f, 500f)
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(210.dp)
+            .shadow(
+                elevation = 14.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = Color.Black.copy(alpha = 0.4f),
+                spotColor = baseColor.copy(alpha = 0.6f)
+            )
+            .clip(RoundedCornerShape(18.dp))
+            .graphicsLayer {
+                rotationY = rotation
+                cameraDistance = 14f * density
+            }
+            .background(cardBrush)
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.35f),
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.15f)
+                    )
+                ),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .clickable {
+                haptics?.cardFlip()
+                if (onCardClick != null) {
+                    onCardClick()
+                } else {
+                    isFlipped = !isFlipped
+                }
+            }
+    ) {
+        if (rotation <= 90f) {
+            // FRONT OF CARD
+            CardFrontContent(
+                card = card,
+                onFlipRequest = {
+                    haptics?.cardFlip()
+                    isFlipped = true
+                }
+            )
+        } else {
+            // BACK OF CARD (Mirror fix)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { rotationY = 180f }
+            ) {
+                CardBackContent(
+                    card = card,
+                    showFullCvv = showFullCvv,
+                    onToggleCvv = {
+                        haptics?.cardSelect()
+                        showFullCvv = !showFullCvv
+                    },
+                    onCopyNumber = {
+                        clipboardManager.setText(AnnotatedString(card.cardNumber))
+                        haptics?.success()
+                    },
+                    onFlipRequest = {
+                        haptics?.cardFlip()
+                        isFlipped = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardFrontContent(
+    card: CardEntity,
+    onFlipRequest: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        // Metallic card surface sheen overlay
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                color = Color.White.copy(alpha = 0.04f),
+                radius = size.width * 0.7f,
+                center = Offset(size.width * 0.9f, size.height * 0.1f)
+            )
+        }
+
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+            // Top Row: Bank Name / Issuer + Contactless & Category
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = card.bankOrIssuer.ifBlank { card.title }.uppercase(),
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    if (card.bankOrIssuer.isNotBlank() && card.title != card.bankOrIssuer) {
+                        Text(
+                            text = card.title,
+                            color = Color.White.copy(alpha = 0.65f),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (card.nfcTagUid.isNotBlank() || card.scannedVia == "NFC") {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF0284C7).copy(alpha = 0.35f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "NFC ACTIVE",
+                                color = Color(0xFF7DD3FC),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.Contactless,
+                        contentDescription = "Contactless EMV",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            // Middle Row: EMV Chip + Card Number
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Gold Metallic EMV Chip
+                EmvChipView()
+                Spacer(modifier = Modifier.width(14.dp))
+                Text(
+                    text = card.maskedNumber,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 2.sp
+                )
+            }
+
+            // Bottom Row: Cardholder Name, Expiry, and Network Logo
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Column {
+                    Text(
+                        text = "CARDHOLDER",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = card.cardholderName.ifBlank { "CARDHOLDER NAME" }.uppercase(),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "EXPIRES",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = card.expiryDate.ifBlank { "••/••" },
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                CardNetworkLogoBadge(cardType = card.cardType)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardBackContent(
+    card: CardEntity,
+    showFullCvv: Boolean,
+    onToggleCvv: () -> Unit,
+    onCopyNumber: () -> Unit,
+    onFlipRequest: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 14.dp)
+    ) {
+        // Magnetic Stripe
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .background(Color(0xFF0F0F11))
+                .border(width = 0.5.dp, color = Color.White.copy(alpha = 0.1f))
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Signature Bar & CVV Box
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // White signature strip
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFE2E8F0))
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = "Authorized Signature",
+                    color = Color(0xFF64748B),
+                    fontSize = 10.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // CVV Box with toggle
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.White.copy(alpha = 0.15f))
+                    .clickable { onToggleCvv() }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "CVV: ",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (showFullCvv) card.cvv.ifBlank { "•••" } else "•••",
+                    color = Color(0xFFFACC15),
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = if (showFullCvv) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    contentDescription = "Toggle CVV",
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Bottom info and copy action
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "CUSTOMER SERVICE: 1-800-SECURE-VAULT",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 8.sp,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = "Tap card to flip back",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 10.sp
+                )
+            }
+
+            IconButton(
+                onClick = onCopyNumber,
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy Card Number",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EmvChipView(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(width = 38.dp, height = 28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFFFDE68A),
+                        Color(0xFFD97706),
+                        Color(0xFFF59E0B)
+                    )
+                )
+            )
+            .border(0.5.dp, Color(0xFF92400E), RoundedCornerShape(6.dp))
+            .padding(2.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 1f
+            val chipColor = Color(0xFF78350F)
+            // Chip internal division circuit lines
+            drawLine(
+                chipColor,
+                Offset(size.width * 0.35f, 0f),
+                Offset(size.width * 0.35f, size.height),
+                strokeWidth
+            )
+            drawLine(
+                chipColor,
+                Offset(size.width * 0.65f, 0f),
+                Offset(size.width * 0.65f, size.height),
+                strokeWidth
+            )
+            drawLine(
+                chipColor,
+                Offset(0f, size.height * 0.5f),
+                Offset(size.width, size.height * 0.5f),
+                strokeWidth
+            )
+        }
+    }
+}
+
+@Composable
+fun CardNetworkLogoBadge(cardType: String, modifier: Modifier = Modifier) {
+    when (cardType.uppercase()) {
+        "VISA" -> {
+            Text(
+                text = "VISA",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Black,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                letterSpacing = 1.sp,
+                modifier = modifier
+            )
+        }
+        "MASTERCARD" -> {
+            Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFEF4444))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer { translationX = -12f }
+                        .clip(CircleShape)
+                        .background(Color(0xFFF59E0B).copy(alpha = 0.9f))
+                )
+            }
+        }
+        "AMEX" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF006FCF))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "AMEX",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        }
+        "DISCOVER" -> {
+            Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "DISC",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF97316))
+                )
+                Text(
+                    text = "VER",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        "ID_CARD" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.White.copy(alpha = 0.2f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "IDENTIFICATION",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        "TRANSIT" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFA21CAF))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "TRANSIT PASS",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        else -> {
+            Icon(
+                imageVector = Icons.Default.CreditCard,
+                contentDescription = cardType,
+                tint = Color.White.copy(alpha = 0.9f),
+                modifier = modifier.size(24.dp)
+            )
+        }
+    }
+}
