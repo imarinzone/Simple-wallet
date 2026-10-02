@@ -5,10 +5,17 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.view.HapticFeedbackConstants
-import android.view.View
+import kotlin.math.roundToInt
+
+enum class HapticSensitivity(val amplitudeScale: Float, val label: String, val description: String) {
+    LIGHT(0.45f, "Light", "Subtle, gentle micro-ticks"),
+    MEDIUM(1.0f, "Medium", "Balanced tactile feedback"),
+    STRONG(1.6f, "Strong", "Pronounced physical feel")
+}
 
 class HapticsHelper(private val context: Context) {
+
+    var sensitivity: HapticSensitivity = HapticSensitivity.MEDIUM
 
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
@@ -18,13 +25,27 @@ class HapticsHelper(private val context: Context) {
         context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
     }
 
+    private fun scaleAmplitude(amp: Int): Int {
+        if (amp <= 0) return 0
+        return (amp * sensitivity.amplitudeScale).roundToInt().coerceIn(1, 255)
+    }
+
+    private fun scaleDuration(ms: Long): Long {
+        return when (sensitivity) {
+            HapticSensitivity.LIGHT -> (ms * 0.7f).roundToInt().toLong().coerceAtLeast(4L)
+            HapticSensitivity.MEDIUM -> ms
+            HapticSensitivity.STRONG -> (ms * 1.3f).roundToInt().toLong()
+        }
+    }
+
     fun cardSlide() {
         if (vibrator?.hasVibrator() == true) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val amp = scaleAmplitude(90)
+                vibrator.vibrate(VibrationEffect.createOneShot(scaleDuration(10), amp))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(12)
+                vibrator.vibrate(scaleDuration(12))
             }
         }
     }
@@ -34,11 +55,12 @@ class HapticsHelper(private val context: Context) {
      */
     fun cardDragTick() {
         if (vibrator?.hasVibrator() == true) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val amp = scaleAmplitude(60)
+                vibrator.vibrate(VibrationEffect.createOneShot(scaleDuration(8), amp))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(8)
+                vibrator.vibrate(scaleDuration(8))
             }
         }
     }
@@ -49,13 +71,12 @@ class HapticsHelper(private val context: Context) {
     fun stackExpand() {
         if (vibrator?.hasVibrator() == true) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Rising triple-tick ruffle waveform mimicking physical plastic cards fanning out
-                val timings = longArrayOf(0, 10, 22, 14, 25, 20)
-                val amplitudes = intArrayOf(0, 75, 0, 140, 0, 220)
+                val timings = longArrayOf(0, scaleDuration(10), 22, scaleDuration(14), 25, scaleDuration(20))
+                val amplitudes = intArrayOf(0, scaleAmplitude(75), 0, scaleAmplitude(140), 0, scaleAmplitude(220))
                 vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(longArrayOf(0, 12, 20, 18), -1)
+                vibrator.vibrate(longArrayOf(0, scaleDuration(12), 20, scaleDuration(18)), -1)
             }
         }
     }
@@ -66,15 +87,12 @@ class HapticsHelper(private val context: Context) {
     fun stackCollapse() {
         if (vibrator?.hasVibrator() == true) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Damped contact followed by solid slot seat
-                val timings = longArrayOf(0, 14, 26, 30)
-                val amplitudes = intArrayOf(0, 110, 0, 190)
+                val timings = longArrayOf(0, scaleDuration(14), 26, scaleDuration(30))
+                val amplitudes = intArrayOf(0, scaleAmplitude(110), 0, scaleAmplitude(190))
                 vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(35)
+                vibrator.vibrate(scaleDuration(35))
             }
         }
     }
@@ -85,26 +103,24 @@ class HapticsHelper(private val context: Context) {
     fun cardDraw() {
         if (vibrator?.hasVibrator() == true) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val timings = longArrayOf(0, 10, 20, 22)
-                val amplitudes = intArrayOf(0, 95, 0, 210)
+                val timings = longArrayOf(0, scaleDuration(10), 20, scaleDuration(22))
+                val amplitudes = intArrayOf(0, scaleAmplitude(95), 0, scaleAmplitude(210))
                 vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(25)
+                vibrator.vibrate(scaleDuration(25))
             }
         }
     }
 
     fun cardSelect() {
-
         if (vibrator?.hasVibrator() == true) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val amp = scaleAmplitude(115)
+                vibrator.vibrate(VibrationEffect.createOneShot(scaleDuration(18), amp))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(25)
+                vibrator.vibrate(scaleDuration(20))
             }
         }
     }
@@ -112,24 +128,24 @@ class HapticsHelper(private val context: Context) {
     fun walletOpen() {
         if (vibrator?.hasVibrator() == true) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Two-stage unfold feel: light tick followed by deep leather settle
-                val timings = longArrayOf(0, 15, 40, 35)
-                val amplitudes = intArrayOf(0, 80, 0, 180)
+                val timings = longArrayOf(0, scaleDuration(15), 40, scaleDuration(35))
+                val amplitudes = intArrayOf(0, scaleAmplitude(80), 0, scaleAmplitude(180))
                 vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(40)
+                vibrator.vibrate(scaleDuration(40))
             }
         }
     }
 
     fun walletClose() {
         if (vibrator?.hasVibrator() == true) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val amp = scaleAmplitude(180)
+                vibrator.vibrate(VibrationEffect.createOneShot(scaleDuration(35), amp))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(50)
+                vibrator.vibrate(scaleDuration(50))
             }
         }
     }
@@ -137,21 +153,24 @@ class HapticsHelper(private val context: Context) {
     fun cardFlip() {
         if (vibrator?.hasVibrator() == true) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(18, 120))
+                val amp = scaleAmplitude(120)
+                vibrator.vibrate(VibrationEffect.createOneShot(scaleDuration(18), amp))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(18)
+                vibrator.vibrate(scaleDuration(18))
             }
         }
     }
 
     fun success() {
         if (vibrator?.hasVibrator() == true) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val timings = longArrayOf(0, scaleDuration(20), 40, scaleDuration(25))
+                val amplitudes = intArrayOf(0, scaleAmplitude(140), 0, scaleAmplitude(220))
+                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(longArrayOf(0, 30, 60, 30), -1)
+                vibrator.vibrate(longArrayOf(0, scaleDuration(30), 60, scaleDuration(30)), -1)
             }
         }
     }
@@ -159,12 +178,12 @@ class HapticsHelper(private val context: Context) {
     fun error() {
         if (vibrator?.hasVibrator() == true) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val timings = longArrayOf(0, 40, 50, 40, 50, 40)
-                val amplitudes = intArrayOf(0, 220, 0, 220, 0, 220)
+                val timings = longArrayOf(0, scaleDuration(40), 50, scaleDuration(40), 50, scaleDuration(40))
+                val amplitudes = intArrayOf(0, scaleAmplitude(220), 0, scaleAmplitude(220), 0, scaleAmplitude(220))
                 vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(longArrayOf(0, 40, 50, 40), -1)
+                vibrator.vibrate(longArrayOf(0, scaleDuration(40), 50, scaleDuration(40)), -1)
             }
         }
     }
