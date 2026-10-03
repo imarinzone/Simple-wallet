@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,8 +50,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.security.HapticSensitivity
 import com.example.security.HapticsHelper
 import com.example.ui.components.LeatherFinish
 import com.example.ui.components.LeatherFinishes
@@ -72,6 +75,8 @@ fun SettingsScreen(
     onUpdateMasterPin: (String) -> Unit,
     isHapticsEnabled: Boolean,
     onToggleHaptics: (Boolean) -> Unit,
+    hapticSensitivity: HapticSensitivity = HapticSensitivity.MEDIUM,
+    onHapticSensitivityChange: (HapticSensitivity) -> Unit = {},
     onNavigateBack: () -> Unit,
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
@@ -106,20 +111,20 @@ fun SettingsScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(22.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // THEME MODE SELECTOR
             SettingSection(title = "APPEARANCE & DARK MODE", icon = Icons.Default.DarkMode) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ThemeOptionButton(
-                        title = "Dark Mode",
+                        title = "Dark",
                         icon = Icons.Default.DarkMode,
                         isSelected = currentThemeMode == ThemeMode.DARK,
                         onClick = {
@@ -129,7 +134,7 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f)
                     )
                     ThemeOptionButton(
-                        title = "Light Mode",
+                        title = "Light",
                         icon = Icons.Default.LightMode,
                         isSelected = currentThemeMode == ThemeMode.LIGHT,
                         onClick = {
@@ -170,71 +175,171 @@ fun SettingsScreen(
                                     haptics?.cardSelect()
                                     onLeatherFinishChange(finish)
                                 }
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(finish.primaryColor)
-                                        .border(2.dp, finish.hardwareColor, CircleShape)
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(finish.primaryColor)
+                                    .border(2.dp, finish.hardwareColor, CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = finish.name,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                Spacer(modifier = Modifier.width(14.dp))
-                                Column {
-                                    Text(
-                                        text = finish.name,
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "Top-grain crafted leather texture",
-                                        color = Color.White.copy(alpha = 0.5f),
-                                        fontSize = 11.sp
-                                    )
-                                }
+                                Text(
+                                    text = "Top-grain crafted leather texture",
+                                    color = Color.White.copy(alpha = 0.5f),
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
-
                             if (isSelected) {
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
+                                        .size(10.dp)
+                                        .clip(CircleShape)
                                         .background(finish.hardwareColor)
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "ACTIVE",
-                                        color = Color(0xFF261502),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                                )
                             }
                         }
                     }
                 }
             }
 
-            // BIOMETRIC & SECURITY SETTINGS
-            SettingSection(title = "BIOMETRICS & SECURITY LOCK", icon = Icons.Default.Fingerprint) {
+            // TACTILE HAPTIC FEEDBACK & SENSITIVITY
+            SettingSection(title = "TACTILE HAPTIC FEEDBACK", icon = Icons.Default.Vibration) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = "Haptic Interactions",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Vibrate on wallet unfold, card slide, and tap",
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Switch(
+                            checked = isHapticsEnabled,
+                            onCheckedChange = {
+                                onToggleHaptics(it)
+                                if (it) haptics?.walletOpen()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFFE5A93C),
+                                checkedTrackColor = Color(0xFF5A3B18)
+                            )
+                        )
+                    }
+
+                    if (isHapticsEnabled) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = "HAPTIC FEEDBACK SENSITIVITY",
+                            color = Color(0xFFE5A93C),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (sensitivity in HapticSensitivity.values()) {
+                                val isSelected = sensitivity == hapticSensitivity
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) Color(0xFFE5A93C) else Color(0xFF26201C))
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isSelected) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.08f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable {
+                                            onHapticSensitivityChange(sensitivity)
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = sensitivity.label,
+                                            color = if (isSelected) Color(0xFF261502) else Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = when (sensitivity) {
+                                                HapticSensitivity.LIGHT -> "Gentle"
+                                                HapticSensitivity.MEDIUM -> "Normal"
+                                                HapticSensitivity.STRONG -> "Firm"
+                                            },
+                                            color = if (isSelected) Color(0xFF261502).copy(alpha = 0.8f) else Color.White.copy(alpha = 0.55f),
+                                            fontSize = 10.sp,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = hapticSensitivity.description,
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            // BIOMETRIC AND SECURITY
+            SettingSection(title = "SECURITY & BIOMETRIC LOCK", icon = Icons.Default.Security) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                             Text(
-                                text = "Require Biometric Authentication",
+                                text = "Biometric Lock",
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Prompt for Fingerprint or Face ID on opening",
+                                text = "Require fingerprint or PIN when entering wallet",
                                 color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 11.sp
                             )
@@ -253,60 +358,37 @@ fun SettingsScreen(
                         )
                     }
 
-                    // Master PIN setting
-                    OutlinedTextField(
-                        value = newPinInput,
-                        onValueChange = {
-                            if (it.length <= 6 && it.all { char -> char.isDigit() }) {
-                                newPinInput = it
-                                onUpdateMasterPin(it)
-                            }
-                        },
-                        label = { Text("Master Wallet PIN") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFFE5A93C),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-                }
-            }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
 
-            // HAPTICS & TACTILE FEEDBACK
-            SettingSection(title = "TACTILE HAPTIC FEEDBACK", icon = Icons.Default.Vibration) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Column {
                         Text(
-                            text = "Haptic Interactions",
+                            text = "Master Unlock PIN",
                             color = Color.White,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )
-                        Text(
-                            text = "Vibrate on wallet unfold, card slide, and tap",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 11.sp
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = newPinInput,
+                            onValueChange = {
+                                if (it.length <= 4 && it.all { char -> char.isDigit() }) {
+                                    newPinInput = it
+                                    if (it.length == 4) {
+                                        onUpdateMasterPin(it)
+                                    }
+                                }
+                            },
+                            placeholder = { Text("4-digit PIN (e.g. 1234)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFE5A93C),
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            singleLine = true
                         )
                     }
-
-                    Switch(
-                        checked = isHapticsEnabled,
-                        onCheckedChange = {
-                            onToggleHaptics(it)
-                            if (it) haptics?.walletOpen()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFFE5A93C),
-                            checkedTrackColor = Color(0xFF5A3B18)
-                        )
-                    )
                 }
             }
 
@@ -354,7 +436,7 @@ private fun SettingSection(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = title,
-                color = Color(0xFFE5A93C),
+                color = Color.White.copy(alpha = 0.75f),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
@@ -367,7 +449,7 @@ private fun SettingSection(
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF1B1714))
                 .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             content()
         }
@@ -387,7 +469,7 @@ private fun ThemeOptionButton(
             .clip(RoundedCornerShape(12.dp))
             .background(if (isSelected) Color(0xFFE5A93C) else Color(0xFF26201C))
             .clickable { onClick() }
-            .padding(vertical = 12.dp),
+            .padding(vertical = 10.dp, horizontal = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -395,14 +477,15 @@ private fun ThemeOptionButton(
                 imageVector = icon,
                 contentDescription = null,
                 tint = if (isSelected) Color(0xFF261502) else Color.White,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = title,
                 color = if (isSelected) Color(0xFF261502) else Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
             )
         }
     }

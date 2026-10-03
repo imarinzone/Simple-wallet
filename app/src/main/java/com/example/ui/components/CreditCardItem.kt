@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CardEntity
@@ -190,20 +191,24 @@ private fun CardFrontContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)) {
                     Text(
                         text = card.bankOrIssuer.ifBlank { card.title }.uppercase(),
                         color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp
+                        letterSpacing = 1.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (card.bankOrIssuer.isNotBlank() && card.title != card.bankOrIssuer) {
                         Text(
                             text = card.title,
                             color = m3Theme.primary.copy(alpha = 0.85f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -230,7 +235,7 @@ private fun CardFrontContent(
                         imageVector = Icons.Default.Contactless,
                         contentDescription = "Contactless EMV",
                         tint = m3Theme.tertiary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -245,14 +250,17 @@ private fun CardFrontContent(
                     baseColor = m3Theme.chipBaseColor,
                     detailColor = m3Theme.chipDetailColor
                 )
-                Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = card.maskedNumber,
                     color = Color.White,
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 2.sp
+                    letterSpacing = 1.2.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
             }
 
@@ -262,7 +270,7 @@ private fun CardFrontContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp)) {
                     Text(
                         text = "CARDHOLDER",
                         color = Color.White.copy(alpha = 0.5f),
@@ -271,15 +279,20 @@ private fun CardFrontContent(
                         letterSpacing = 1.sp
                     )
                     Text(
-                        text = card.cardholderName.ifBlank { "CARDHOLDER NAME" }.uppercase(),
+                        text = card.cardholderName.ifBlank { "CARDHOLDER" }.uppercase(),
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.sp
+                        letterSpacing = 0.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
                     Text(
                         text = "EXPIRES",
                         color = Color.White.copy(alpha = 0.5f),
@@ -290,9 +303,10 @@ private fun CardFrontContent(
                     Text(
                         text = card.expiryDate.ifBlank { "••/••" },
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
                     )
                 }
 

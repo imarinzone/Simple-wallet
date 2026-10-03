@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.AppDatabase
 import com.example.data.CardEntity
 import com.example.data.WalletRepository
+import com.example.security.HapticSensitivity
 import com.example.security.HapticsHelper
 import com.example.ui.components.LeatherFinish
 import com.example.ui.components.LeatherFinishes
@@ -75,13 +76,20 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _isHapticsEnabled = MutableStateFlow(true)
     val isHapticsEnabled: StateFlow<Boolean> = _isHapticsEnabled.asStateFlow()
 
+    private val _hapticSensitivity = MutableStateFlow(
+        try {
+            HapticSensitivity.valueOf(prefs.getString("pref_haptic_sensitivity", HapticSensitivity.MEDIUM.name) ?: HapticSensitivity.MEDIUM.name)
+        } catch (e: Exception) {
+            HapticSensitivity.MEDIUM
+        }
+    )
+    val hapticSensitivity: StateFlow<HapticSensitivity> = _hapticSensitivity.asStateFlow()
+
     private val _scannedPhysicalCard = MutableStateFlow<CardEntity?>(null)
     val scannedPhysicalCard: StateFlow<CardEntity?> = _scannedPhysicalCard.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            repository.seedInitialCardsIfEmpty()
-        }
+        haptics.sensitivity = _hapticSensitivity.value
     }
 
     fun onPhysicalNfcCardScanned(card: CardEntity) {
@@ -185,5 +193,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleHaptics(enabled: Boolean) {
         _isHapticsEnabled.value = enabled
+    }
+
+    fun setHapticSensitivity(sensitivity: HapticSensitivity) {
+        _hapticSensitivity.value = sensitivity
+        haptics.sensitivity = sensitivity
+        prefs.edit().putString("pref_haptic_sensitivity", sensitivity.name).apply()
+        haptics.cardSelect()
     }
 }

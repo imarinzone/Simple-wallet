@@ -80,7 +80,7 @@ fun CardDetailBottomSheet(
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 36.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -226,14 +226,16 @@ fun CardDetailBottomSheet(
                     onDeleteCard(card)
                     onDismiss()
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF87171)),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF87171).copy(alpha = 0.5f))
             ) {
                 Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Remove Card from Wallet", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Remove Card from Wallet", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
     }
@@ -254,15 +256,21 @@ private fun DetailRow(
         Text(
             text = label,
             color = Color.White.copy(alpha = 0.6f),
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            modifier = Modifier.weight(0.9f)
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.weight(1.1f),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 text = value,
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                fontFamily = if (isMonospace) FontFamily.Monospace else FontFamily.Default
+                fontFamily = if (isMonospace) FontFamily.Monospace else FontFamily.Default,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End
             )
             if (onToggle != null) {
                 Spacer(modifier = Modifier.width(6.dp))

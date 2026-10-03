@@ -118,7 +118,7 @@ fun SyncBackupScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -213,7 +213,12 @@ fun SyncBackupScreen(
             ) {
                 Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Generate Encrypted Sync Code (${cards.size} Cards)", fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (cards.isEmpty()) "Generate Sync Code" else "Generate Sync Code (${cards.size})",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    maxLines = 1
+                )
             }
 
             AnimatedVisibility(visible = generatedBackupPayload != null) {
@@ -304,12 +309,15 @@ fun SyncBackupScreen(
                             haptics?.cardSelect()
                         }
                     },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
                 ) {
                     Icon(imageVector = Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Paste", fontSize = 12.sp, color = Color.White)
+                    Text("Paste", fontSize = 12.sp, color = Color.White, maxLines = 1)
                 }
 
                 ElevatedButton(
@@ -333,8 +341,11 @@ fun SyncBackupScreen(
                             }
                         }
                     },
-                    modifier = Modifier.weight(1.5f),
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
                         containerColor = Color(0xFF0284C7),
                         contentColor = Color.White
@@ -342,7 +353,7 @@ fun SyncBackupScreen(
                 ) {
                     Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Restore Cards", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Restore Cards", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
 

@@ -188,47 +188,4 @@ class NfcCardReaderManager(private val context: Context) {
             suggestedCard = suggestedCard
         )
     }
-
-    /**
-     * Generates simulated NFC card reading for quick testing in emulator or demo
-     */
-    fun simulateNfcTap(sampleType: String = "VISA"): NfcReadResult {
-        val randomBytes = (1..7).map { (0..255).random().toByte() }.toByteArray()
-        val uidHex = randomBytes.joinToString(":") { "%02X".format(it) }
-        val randomLast4 = (1000..9999).random().toString()
-
-        val (bank, type, hex1, hex2) = when (sampleType.uppercase()) {
-            "AMEX" -> Quadruple("American Express Centurion", "AMEX", "#18181B", "#27272A")
-            "MASTERCARD" -> Quadruple("Mastercard World Elite", "MASTERCARD", "#854D0E", "#CA8A04")
-            "TRANSIT" -> Quadruple("Metro Contactless Transit", "TRANSIT", "#701A75", "#A21CAF")
-            else -> Quadruple("Chase Visa Signature", "VISA", "#0369A1", "#0284C7")
-        }
-
-        val card = CardEntity(
-            title = bank,
-            cardholderName = "ALEXANDER VANCE",
-            cardNumber = "4242 •••• •••• $randomLast4",
-            expiryDate = "10/30",
-            cvv = "941",
-            cardType = type,
-            category = if (type == "TRANSIT") "TRANSIT" else "PAYMENT",
-            bankOrIssuer = bank,
-            themeColorHex = hex1,
-            gradientEndHex = hex2,
-            notes = "Extracted via High-Frequency 13.56MHz NFC ISO-14443 Type A antenna. UID: $uidHex",
-            nfcTagUid = uidHex,
-            scannedVia = "NFC",
-            createdAt = System.currentTimeMillis()
-        )
-
-        return NfcReadResult(
-            tagUidHex = uidHex,
-            cardType = type,
-            estimatedBank = bank,
-            emvAid = "A0000000031010",
-            suggestedCard = card
-        )
-    }
-
-    private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 }

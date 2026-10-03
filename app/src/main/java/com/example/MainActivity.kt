@@ -150,6 +150,7 @@ fun MainAppContent(
     val themeMode by viewModel.themeMode.collectAsState()
     val leatherFinish by viewModel.leatherFinish.collectAsState()
     val isHapticsEnabled by viewModel.isHapticsEnabled.collectAsState()
+    val hapticSensitivity by viewModel.hapticSensitivity.collectAsState()
     val scannedPhysicalCard by viewModel.scannedPhysicalCard.collectAsState()
     val showLockSuggestionDialog by viewModel.showLockSuggestionDialog.collectAsState()
 
@@ -262,6 +263,8 @@ fun MainAppContent(
                         onUpdateMasterPin = { viewModel.setMasterPin(it) },
                         isHapticsEnabled = isHapticsEnabled,
                         onToggleHaptics = { viewModel.toggleHaptics(it) },
+                        hapticSensitivity = hapticSensitivity,
+                        onHapticSensitivityChange = { viewModel.setHapticSensitivity(it) },
                         onNavigateBack = { viewModel.navigateTo(AppScreen.WALLET_HOME) },
                         haptics = haptics
                     )

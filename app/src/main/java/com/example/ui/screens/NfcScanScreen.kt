@@ -158,7 +158,7 @@ fun NfcScanScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -237,56 +237,39 @@ fun NfcScanScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Test NFC Simulator Buttons (Important for emulator and demo environments)
-            Text(
-                text = "EMULATOR & DEMO NFC CONTROLS",
-                color = Color.White.copy(alpha = 0.4f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // Real NFC Hardware Status & Guidance Card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF1E293B).copy(alpha = 0.6f))
+                    .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
             ) {
-                OutlinedButton(
-                    onClick = {
-                        haptics?.success()
-                        val sim = nfcManager.simulateNfcTap("VISA")
-                        readResult = sim
-                        detectedCard = sim.suggestedCard
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Tap Visa", fontSize = 12.sp, color = Color(0xFF7DD3FC))
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        haptics?.success()
-                        val sim = nfcManager.simulateNfcTap("AMEX")
-                        readResult = sim
-                        detectedCard = sim.suggestedCard
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Tap Amex", fontSize = 12.sp, color = Color(0xFF7DD3FC))
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        haptics?.success()
-                        val sim = nfcManager.simulateNfcTap("TRANSIT")
-                        readResult = sim
-                        detectedCard = sim.suggestedCard
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Tap Transit", fontSize = 12.sp, color = Color(0xFF7DD3FC))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF34D399))
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "NFC ANTENNA ACTIVE",
+                            color = Color(0xFF38BDF8),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "ISO/IEC 14443 Type A & B Contactless Reader listening at 13.56 MHz. Hold card steadily near the top back of your device.",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
                 }
             }
 

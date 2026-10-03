@@ -228,7 +228,7 @@ fun ScanCardScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -270,12 +270,13 @@ fun ScanCardScreen(
                         .fillMaxWidth()
                         .height(48.dp),
                     shape = RoundedCornerShape(14.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
                 ) {
                     Icon(imageVector = Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Or Select Card Photo from Gallery", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Select Card Photo from Gallery", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
             } else {
                 // Captured Photo Review & OCR Processing State
@@ -537,8 +538,9 @@ fun ScanCardScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(54.dp),
+                            .height(50.dp),
                         shape = RoundedCornerShape(16.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
                         colors = ButtonDefaults.elevatedButtonColors(
                             containerColor = Color(0xFFE5A93C),
                             contentColor = Color(0xFF231404)
@@ -548,8 +550,9 @@ fun ScanCardScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Save to Secured Wallet",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
                         )
                     }
 

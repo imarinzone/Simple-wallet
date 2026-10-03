@@ -96,6 +96,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -644,99 +645,110 @@ fun SamsungWalletHomeScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 24.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-
-                            // Primary Contactless Pay Button
-                            ElevatedButton(
-                                onClick = {
-                                    haptics?.success()
-                                    isNfcPayingAnimation = true
-                                    coroutineScope.launch {
-                                        delay(2400)
-                                        isNfcPayingAnimation = false
+                                    // Primary Contactless Pay Button
+                                    ElevatedButton(
+                                        onClick = {
+                                            haptics?.success()
+                                            isNfcPayingAnimation = true
+                                            coroutineScope.launch {
+                                                delay(2400)
+                                                isNfcPayingAnimation = false
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .weight(1.2f)
+                                            .height(50.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                        colors = ButtonDefaults.elevatedButtonColors(
+                                            containerColor = if (isNfcPayingAnimation) Color(0xFF10B981) else (activeM3Theme?.primary ?: Color(0xFFE5A93C)),
+                                            contentColor = activeM3Theme?.onPrimary ?: Color(0xFF1F1202)
+                                        ),
+                                        elevation = ButtonDefaults.elevatedButtonElevation(4.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isNfcPayingAnimation) Icons.Default.Check else Icons.Default.Contactless,
+                                                contentDescription = "Pay",
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (isNfcPayingAnimation) "Ready" else "Pay / Tap",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
-                                },
-                                modifier = Modifier
-                                    .weight(1.3f)
-                                    .height(54.dp),
-                                shape = RoundedCornerShape(18.dp),
-                                colors = ButtonDefaults.elevatedButtonColors(
-                                    containerColor = if (isNfcPayingAnimation) Color(0xFF10B981) else (activeM3Theme?.primary ?: Color(0xFFE5A93C)),
-                                    contentColor = activeM3Theme?.onPrimary ?: Color(0xFF1F1202)
-                                ),
-                                elevation = ButtonDefaults.elevatedButtonElevation(6.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = if (isNfcPayingAnimation) Icons.Default.Check else Icons.Default.Contactless,
-                                        contentDescription = "Pay",
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (isNfcPayingAnimation) "Ready to Tap" else "Pay / Tap",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
-                                    )
+
+                                    // Reveal CVV / Details Button
+                                    FilledTonalButton(
+                                        onClick = {
+                                            haptics?.cardSelect()
+                                            isCardRevealed = !isCardRevealed
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(50.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = activeM3Theme?.surfaceContainerHigh ?: Color(0xFF261F1A),
+                                            contentColor = Color.White
+                                        )
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isCardRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = "Show Details",
+                                                tint = activeM3Theme?.primary ?: Color(0xFFE5A93C),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (isCardRevealed) "Hide" else "CVV",
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 13.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+
+                                    // Favorite Toggle Button
+                                    FilledTonalButton(
+                                        onClick = {
+                                            haptics?.cardSelect()
+                                            onToggleFavorite(activeCard.copy(isFavorite = !activeCard.isFavorite))
+                                        },
+                                        modifier = Modifier
+                                            .size(50.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        contentPadding = PaddingValues(0.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = activeM3Theme?.surfaceContainerHigh ?: Color(0xFF261F1A),
+                                            contentColor = if (activeCard.isFavorite) (activeM3Theme?.tertiary ?: Color(0xFFE5A93C)) else Color.White.copy(alpha = 0.6f)
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = if (activeCard.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                            contentDescription = "Favorite",
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
-                            }
-
-                            // Reveal CVV / Details Button
-                            FilledTonalButton(
-                                onClick = {
-                                    haptics?.cardSelect()
-                                    isCardRevealed = !isCardRevealed
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(54.dp),
-                                shape = RoundedCornerShape(18.dp),
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = activeM3Theme?.surfaceContainerHigh ?: Color(0xFF261F1A),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = if (isCardRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = "Show Details",
-                                    tint = activeM3Theme?.primary ?: Color(0xFFE5A93C),
-                                    modifier = Modifier.size(19.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (isCardRevealed) "Hide" else "CVV",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp
-                                )
-                            }
-
-                            // Favorite Toggle Button
-                            FilledTonalButton(
-                                onClick = {
-                                    haptics?.cardSelect()
-                                    onToggleFavorite(activeCard.copy(isFavorite = !activeCard.isFavorite))
-                                },
-                                modifier = Modifier
-                                    .size(54.dp),
-                                shape = RoundedCornerShape(18.dp),
-                                contentPadding = PaddingValues(0.dp),
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = activeM3Theme?.surfaceContainerHigh ?: Color(0xFF261F1A),
-                                    contentColor = if (activeCard.isFavorite) (activeM3Theme?.tertiary ?: Color(0xFFE5A93C)) else Color.White.copy(alpha = 0.6f)
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = if (activeCard.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
-                                    contentDescription = "Favorite",
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
 
                         Spacer(modifier = Modifier.height(18.dp))
 
@@ -744,11 +756,11 @@ fun SamsungWalletHomeScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp)
-                                .clip(RoundedCornerShape(24.dp))
+                                .padding(horizontal = 16.dp)
+                                .clip(RoundedCornerShape(20.dp))
                                 .background(activeM3Theme?.surfaceContainer ?: Color(0xFF1B1613))
-                                .border(1.dp, activeM3Theme?.outlineVariant ?: Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
-                                .padding(20.dp)
+                                .border(1.dp, activeM3Theme?.outlineVariant ?: Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                                .padding(16.dp)
                         ) {
                             Column {
                                 Row(
@@ -756,21 +768,24 @@ fun SamsungWalletHomeScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                                         Text(
                                             text = activeCard.title.ifBlank { "Payment Card" },
                                             color = Color.White,
-                                            fontSize = 17.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             text = "${activeCard.bankOrIssuer} • ${activeCard.cardType}",
                                             color = activeM3Theme?.primary ?: Color(0xFFE5A93C),
                                             fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
-
 
                                     // Copy number button
                                     IconButton(
@@ -793,31 +808,34 @@ fun SamsungWalletHomeScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
                                 HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
                                 // Information Grid
                                 Row(modifier = Modifier.fillMaxWidth()) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(modifier = Modifier.weight(1.1f).padding(end = 4.dp)) {
                                         Text("CARDHOLDER", color = Color.White.copy(alpha = 0.45f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = activeCard.cardholderName.ifBlank { "CARDHOLDER" },
                                             color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
 
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(modifier = Modifier.weight(0.9f).padding(end = 4.dp)) {
                                         Text("EXPIRES", color = Color.White.copy(alpha = 0.45f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = activeCard.expiryDate.ifBlank { "••/••" },
                                             color = Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
                                         )
                                     }
 
@@ -827,8 +845,9 @@ fun SamsungWalletHomeScreen(
                                         Text(
                                             text = if (isCardRevealed) activeCard.cvv.ifBlank { "•••" } else "•••",
                                             color = if (isCardRevealed) Color(0xFFE5A93C) else Color.White,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
                                         )
                                     }
                                 }
@@ -957,7 +976,7 @@ fun SamsungWalletHomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 14.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     ElevatedButton(
                         onClick = {
@@ -966,13 +985,13 @@ fun SamsungWalletHomeScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(58.dp),
-                        shape = RoundedCornerShape(22.dp),
+                            .height(52.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.elevatedButtonColors(
                             containerColor = Color(0xFFE5A93C),
                             contentColor = Color(0xFF1E1002)
                         ),
-                        elevation = ButtonDefaults.elevatedButtonElevation(8.dp)
+                        elevation = ButtonDefaults.elevatedButtonElevation(6.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -980,7 +999,7 @@ fun SamsungWalletHomeScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .size(24.dp)
                                     .clip(CircleShape)
                                     .background(Color(0xFF1E1002)),
                                 contentAlignment = Alignment.Center
@@ -989,13 +1008,13 @@ fun SamsungWalletHomeScreen(
                                     imageVector = Icons.Default.Add,
                                     contentDescription = "Add Card",
                                     tint = Color(0xFFE5A93C),
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = "Add to Wallet",
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.3.sp
                             )
