@@ -76,6 +76,7 @@ class MainActivity : FragmentActivity() {
             val viewModel: WalletViewModel = viewModel()
             activeViewModel = viewModel
             val themeMode by viewModel.themeMode.collectAsState()
+            val pixelAccent by viewModel.pixelAccent.collectAsState()
 
             val isDarkTheme = when (themeMode) {
                 ThemeMode.DARK -> true
@@ -83,7 +84,10 @@ class MainActivity : FragmentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
 
-            VaultFolioTheme(darkTheme = isDarkTheme) {
+            VaultFolioTheme(
+                darkTheme = isDarkTheme,
+                accentColor = pixelAccent
+            ) {
                 MainAppContent(
                     activity = this@MainActivity,
                     viewModel = viewModel
@@ -148,6 +152,7 @@ fun MainAppContent(
     val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
     val masterPin by viewModel.masterPin.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+    val pixelAccent by viewModel.pixelAccent.collectAsState()
     val leatherFinish by viewModel.leatherFinish.collectAsState()
     val isHapticsEnabled by viewModel.isHapticsEnabled.collectAsState()
     val hapticSensitivity by viewModel.hapticSensitivity.collectAsState()
@@ -155,6 +160,7 @@ fun MainAppContent(
     val showLockSuggestionDialog by viewModel.showLockSuggestionDialog.collectAsState()
 
     var showAddCardChooser by remember { mutableStateOf(false) }
+    var startInManualMode by remember { mutableStateOf(false) }
     var biometricErrorMessage by remember { mutableStateOf<String?>(null) }
 
     val haptics = if (isHapticsEnabled) viewModel.haptics else null
@@ -230,6 +236,7 @@ fun MainAppContent(
                     ScanCardScreen(
                         onNavigateBack = { viewModel.navigateTo(AppScreen.WALLET_HOME) },
                         onCardSaved = { viewModel.saveCard(it) },
+                        initialManualMode = startInManualMode,
                         haptics = haptics
                     )
                 }
@@ -256,8 +263,8 @@ fun MainAppContent(
                     SettingsScreen(
                         currentThemeMode = themeMode,
                         onThemeModeChange = { viewModel.setThemeMode(it) },
-                        currentLeatherFinish = leatherFinish,
-                        onLeatherFinishChange = { viewModel.setLeatherFinish(it) },
+                        currentAccentColor = pixelAccent,
+                        onAccentColorChange = { viewModel.setPixelAccent(it) },
                         isBiometricLockEnabled = isBiometricEnabled,
                         onToggleBiometricLock = { viewModel.toggleBiometricEnabled(it) },
                         masterPin = masterPin,
@@ -278,11 +285,17 @@ fun MainAppContent(
                     onDismiss = { showAddCardChooser = false },
                     onChooseCameraScan = {
                         showAddCardChooser = false
+                        startInManualMode = false
                         viewModel.navigateTo(AppScreen.SCAN_CAMERA)
                     },
                     onChooseNfcScan = {
                         showAddCardChooser = false
                         viewModel.navigateTo(AppScreen.SCAN_NFC)
+                    },
+                    onChooseManualEntry = {
+                        showAddCardChooser = false
+                        startInManualMode = true
+                        viewModel.navigateTo(AppScreen.SCAN_CAMERA)
                     },
                     haptics = haptics
                 )
@@ -327,7 +340,7 @@ fun MainAppContent(
                     },
                     title = {
                         Text(
-                            text = "Add Fingerprint or App Lock?",
+                            text = "Enable App Lock?",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
@@ -335,10 +348,9 @@ fun MainAppContent(
                     },
                     text = {
                         Text(
-                            text = "Keep your payment cards and digital wallet safe. You can secure VaultFolio with your device's fingerprint or PIN. Lock is completely optional and can be turned on or off anytime in Settings.",
+                            text = "Protect your cards with fingerprint or PIN.",
                             color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 13.sp,
-                            lineHeight = 19.sp
+                            fontSize = 14.sp
                         )
                     },
                     confirmButton = {
@@ -352,14 +364,14 @@ fun MainAppContent(
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Turn On Lock", fontWeight = FontWeight.Bold)
+                            Text("Enable", fontWeight = FontWeight.Bold)
                         }
                     },
                     dismissButton = {
                         TextButton(
                             onClick = { viewModel.dismissLockSuggestion() }
                         ) {
-                            Text("Not Now", color = Color.White.copy(alpha = 0.65f))
+                            Text("Skip", color = Color.White.copy(alpha = 0.65f))
                         }
                     },
                     containerColor = Color(0xFF1E1A17),

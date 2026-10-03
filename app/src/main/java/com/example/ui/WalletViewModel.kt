@@ -12,6 +12,7 @@ import com.example.security.HapticsHelper
 import com.example.ui.components.LeatherFinish
 import com.example.ui.components.LeatherFinishes
 import com.example.ui.screens.ThemeMode
+import com.example.ui.theme.PixelAccentColor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -67,8 +68,23 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _masterPin = MutableStateFlow(prefs.getString("pref_master_pin", "1234") ?: "1234")
     val masterPin: StateFlow<String> = _masterPin.asStateFlow()
 
-    private val _themeMode = MutableStateFlow(ThemeMode.DARK)
+    private val _themeMode = MutableStateFlow(
+        try {
+            ThemeMode.valueOf(prefs.getString("pref_theme_mode", ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name)
+        } catch (e: Exception) {
+            ThemeMode.SYSTEM
+        }
+    )
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
+    private val _pixelAccent = MutableStateFlow(
+        try {
+            PixelAccentColor.valueOf(prefs.getString("pref_pixel_accent", PixelAccentColor.BLUE.name) ?: PixelAccentColor.BLUE.name)
+        } catch (e: Exception) {
+            PixelAccentColor.BLUE
+        }
+    )
+    val pixelAccent: StateFlow<PixelAccentColor> = _pixelAccent.asStateFlow()
 
     private val _leatherFinish = MutableStateFlow(LeatherFinishes[0])
     val leatherFinish: StateFlow<LeatherFinish> = _leatherFinish.asStateFlow()
@@ -172,6 +188,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setThemeMode(mode: ThemeMode) {
         _themeMode.value = mode
+        prefs.edit().putString("pref_theme_mode", mode.name).apply()
+    }
+
+    fun setPixelAccent(accent: PixelAccentColor) {
+        _pixelAccent.value = accent
+        prefs.edit().putString("pref_pixel_accent", accent.name).apply()
     }
 
     fun setLeatherFinish(finish: LeatherFinish) {

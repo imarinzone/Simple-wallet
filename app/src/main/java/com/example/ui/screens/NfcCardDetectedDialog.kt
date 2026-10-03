@@ -1,23 +1,31 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Nfc
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,13 +33,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,6 +68,21 @@ fun NfcCardDetectedDialog(
     modifier: Modifier = Modifier
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
+
+    var cardTitle by remember { mutableStateOf(card.title.ifBlank { "${card.bankOrIssuer.ifBlank { card.cardType }} Card" }) }
+    var enteredCvv by remember { mutableStateOf(card.cvv) }
+    var showFullNumber by remember { mutableStateOf(false) }
+    var showCvvInput by remember { mutableStateOf(false) }
+    var copiedLabel by remember { mutableStateOf<String?>(null) }
+
+    fun copyToClipboard(label: String, text: String) {
+        if (text.isNotBlank()) {
+            clipboardManager.setText(AnnotatedString(text))
+            haptics?.success()
+            copiedLabel = label
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -62,6 +94,8 @@ fun NfcCardDetectedDialog(
         Column(
             modifier = modifier
                 .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -88,20 +122,12 @@ fun NfcCardDetectedDialog(
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Physical NFC Card Detected!",
-                            color = Color.White,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Authenticated with contactless chip",
-                            color = Color(0xFF38BDF8),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Text(
+                        text = "NFC Card Detected",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 IconButton(onClick = onDismiss) {
@@ -113,55 +139,284 @@ fun NfcCardDetectedDialog(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Card Preview
+            // Card Preview (live preview with entered CVV and title)
+            val previewCard = card.copy(
+                title = cardTitle,
+                cvv = enteredCvv
+            )
+
             CreditCardItem(
-                card = card,
+                card = previewCard,
                 haptics = haptics
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // NFC Diagnostic Metadata
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF1E293B))
-                    .padding(14.dp)
-            ) {
-                Column {
+            // Copied notification banner
+            if (copiedLabel != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF34D399).copy(alpha = 0.2f))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
                     Text(
-                        text = "NFC HARDWARE TELEMETRY",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 10.sp,
+                        text = "✓ $copiedLabel Copied to Clipboard",
+                        color = Color(0xFF34D399),
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    if (card.nfcTagUid.isNotBlank()) {
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            // Quick Data Actions: Copy Number & Copy Name separately
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        copyToClipboard("Card Number", card.cardNumber)
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Copy Number", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                if (card.cardholderName.isNotBlank()) {
+                    OutlinedButton(
+                        onClick = {
+                            copyToClipboard("Cardholder Name", card.cardholderName)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    ) {
+                        Icon(imageVector = Icons.Default.Person, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Copy Name", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Card Information Section with Number Reveal Button
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF1E293B).copy(alpha = 0.7f))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Card Number Row with Reveal Button and Copy Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Card Number",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(0.8f)
+                    )
+
+                    Row(
+                        modifier = Modifier.weight(1.2f),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val numToDisplay = if (showFullNumber) {
+                            card.formattedNumber.ifBlank { card.cardNumber }
+                        } else {
+                            card.maskedNumber
+                        }
+
                         Text(
-                            text = "Tag UID: ${card.nfcTagUid}",
+                            text = numToDisplay,
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            fontFamily = FontFamily.Monospace,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        // Reveal / Hide Number Toggle Button
+                        IconButton(
+                            onClick = {
+                                haptics?.cardSelect()
+                                showFullNumber = !showFullNumber
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (showFullNumber) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (showFullNumber) "Hide Number" else "Show Number",
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        // Copy Number Button
+                        IconButton(
+                            onClick = { copyToClipboard("Card Number", card.cardNumber) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Number",
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Cardholder Name Row with Copy Button
+                if (card.cardholderName.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Cardholder",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = card.cardholderName,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Spacer(modifier = Modifier.width(4.dp))
+
+                            IconButton(
+                                onClick = { copyToClipboard("Cardholder Name", card.cardholderName) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy Name",
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Expiry Date Row
+                if (card.expiryDate.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Expiration",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
+
+                        Text(
+                            text = card.expiryDate,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
                             fontFamily = FontFamily.Monospace
                         )
                     }
-                    Text(
-                        text = "Protocol: ISO/IEC 14443 Type A/B Contactless EMV",
-                        color = Color(0xFFCBD5E1),
-                        fontSize = 11.sp
-                    )
-                    if (card.notes.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
+                }
+
+                // Bank / Issuer
+                if (card.bankOrIssuer.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = card.notes,
-                            color = Color(0xFF93C5FD),
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
+                            text = "Issuer",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
+
+                        Text(
+                            text = card.bankOrIssuer,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // CVV Input Section (NFC never transmits CVV for security, so user can add it here)
+            val fieldColors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF38BDF8),
+                unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedLabelColor = Color(0xFF38BDF8),
+                unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = cardTitle,
+                    onValueChange = { cardTitle = it },
+                    label = { Text("Card Label") },
+                    modifier = Modifier.weight(1.2f),
+                    colors = fieldColors,
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = enteredCvv,
+                    onValueChange = { input ->
+                        enteredCvv = input.filter { it.isDigit() }.take(4)
+                    },
+                    label = { Text("CVV (Optional)") },
+                    placeholder = { Text("•••") },
+                    modifier = Modifier.weight(0.8f),
+                    colors = fieldColors,
+                    singleLine = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showCvvInput = !showCvvInput }) {
+                            Icon(
+                                imageVector = if (showCvvInput) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Toggle CVV Visibility",
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                )
             }
 
             if (card.cardNumber.isBlank()) {
@@ -175,11 +430,11 @@ fun NfcCardDetectedDialog(
                     modifier = Modifier.fillMaxWidth().height(46.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.7f))
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.7f))
                 ) {
                     Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Scan with Camera OCR to Complete Card Number", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Scan with Camera for Full Number", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -195,7 +450,7 @@ fun NfcCardDetectedDialog(
                         haptics?.cardSelect()
                         onDismiss()
                     },
-                    modifier = Modifier.weight(1f).height(50.dp),
+                    modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                 ) {
@@ -204,11 +459,15 @@ fun NfcCardDetectedDialog(
 
                 ElevatedButton(
                     onClick = {
+                        val finalCard = card.copy(
+                            title = cardTitle.ifBlank { "${card.bankOrIssuer.ifBlank { card.cardType }} Card" },
+                            cvv = enteredCvv
+                        )
                         haptics?.success()
-                        onSaveToWallet(card)
+                        onSaveToWallet(finalCard)
                         onDismiss()
                     },
-                    modifier = Modifier.weight(1.5f).height(50.dp),
+                    modifier = Modifier.weight(1.4f).height(48.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
                         containerColor = Color(0xFF0284C7),
@@ -217,7 +476,7 @@ fun NfcCardDetectedDialog(
                 ) {
                     Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Save to Wallet", fontWeight = FontWeight.Bold)
+                    Text("Save Card", fontWeight = FontWeight.Bold)
                 }
             }
         }

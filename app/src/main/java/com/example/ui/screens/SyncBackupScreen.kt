@@ -94,8 +94,8 @@ fun SyncBackupScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Cross-Device Sync & Backup",
-                            fontSize = 17.sp,
+                            text = "Backup & Sync",
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -124,43 +124,6 @@ fun SyncBackupScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Privacy Security Banner
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF1F1B17))
-                    .border(1.dp, Color(0xFFE5A93C).copy(alpha = 0.35f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = Color(0xFF34D399),
-                        modifier = Modifier.size(26.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = "Zero-Knowledge Local Encryption",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Your card numbers and CVVs are stored locally with hardware-backed security. Sync payloads are encrypted and never stored on third-party servers.",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
             if (statusMessage != null) {
                 Box(
                     modifier = Modifier
@@ -179,13 +142,12 @@ fun SyncBackupScreen(
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            // SECTION 1: EXPORT ENCRYPTED BACKUP
+            // SECTION 1: EXPORT
             Text(
-                text = "EXPORT BACKUP FOR OTHER DEVICES",
+                text = "Export Backup",
                 color = Color(0xFFE5A93C),
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
                 modifier = Modifier.align(Alignment.Start)
             )
 
@@ -198,7 +160,7 @@ fun SyncBackupScreen(
                         generatedBackupPayload = json
                         clipboardManager.setText(AnnotatedString(json))
                         haptics?.success()
-                        statusMessage = "Backup payload generated & copied to clipboard! Ready to restore on any secondary device."
+                        statusMessage = "Backup copied to clipboard"
                         isSuccess = true
                     }
                 },
@@ -214,7 +176,7 @@ fun SyncBackupScreen(
                 Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (cards.isEmpty()) "Generate Sync Code" else "Generate Sync Code (${cards.size})",
+                    text = if (cards.isEmpty()) "Generate Backup Code" else "Generate Backup Code (${cards.size})",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     maxLines = 1
@@ -248,7 +210,7 @@ fun SyncBackupScreen(
                             if (generatedBackupPayload != null) {
                                 clipboardManager.setText(AnnotatedString(generatedBackupPayload!!))
                                 haptics?.success()
-                                statusMessage = "Encrypted backup copied to clipboard!"
+                                statusMessage = "Backup copied to clipboard"
                                 isSuccess = true
                             }
                         },
@@ -264,13 +226,12 @@ fun SyncBackupScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // SECTION 2: IMPORT & RESTORE BACKUP
+            // SECTION 2: RESTORE
             Text(
-                text = "RESTORE WALLET FROM BACKUP",
+                text = "Restore Backup",
                 color = Color(0xFF38BDF8),
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
                 modifier = Modifier.align(Alignment.Start)
             )
 
@@ -279,7 +240,7 @@ fun SyncBackupScreen(
             OutlinedTextField(
                 value = importInputText,
                 onValueChange = { importInputText = it },
-                label = { Text("Paste VaultFolio backup payload JSON or code") },
+                label = { Text("Backup Code") },
                 placeholder = { Text("{\"version\": 1, \"cards\": [...]}") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -323,7 +284,7 @@ fun SyncBackupScreen(
                 ElevatedButton(
                     onClick = {
                         if (importInputText.isBlank()) {
-                            statusMessage = "Please paste a valid VaultFolio backup JSON"
+                            statusMessage = "Please paste a backup code"
                             isSuccess = false
                             return@ElevatedButton
                         }
@@ -331,7 +292,7 @@ fun SyncBackupScreen(
                             val result = repository.restoreBackupJson(importInputText, replaceExisting = false)
                             result.onSuccess { count ->
                                 haptics?.success()
-                                statusMessage = "Successfully restored $count cards into your secured wallet!"
+                                statusMessage = "Restored $count cards"
                                 isSuccess = true
                                 importInputText = ""
                             }.onFailure { err ->

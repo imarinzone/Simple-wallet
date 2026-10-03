@@ -183,18 +183,10 @@ fun BiometricLockOverlay(
             Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "VAULTFOLIO LOCKED",
-                color = Color(0xFFE5A93C),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp
-            )
-
-            Text(
-                text = "Touch sensor or enter Master PIN to open wallet",
-                color = Color.White.copy(alpha = 0.65f),
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp)
+                text = "Wallet Locked",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
             )
 
             Spacer(modifier = Modifier.height(24.dp))

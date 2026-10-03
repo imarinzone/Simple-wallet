@@ -216,11 +216,6 @@ private fun ClosedWalletView(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(340.dp)
-                .shadow(
-                    elevation = 20.dp,
-                    shape = RoundedCornerShape(26.dp),
-                    spotColor = leatherFinish.primaryColor.copy(alpha = 0.8f)
-                )
                 .clip(RoundedCornerShape(26.dp))
                 .background(
                     Brush.verticalGradient(
@@ -511,7 +506,6 @@ private fun OpenWalletView(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .shadow(16.dp, RoundedCornerShape(22.dp))
                 .clip(RoundedCornerShape(22.dp))
                 .background(
                     Brush.verticalGradient(

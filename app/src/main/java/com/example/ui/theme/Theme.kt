@@ -2,6 +2,7 @@ package com.example.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -11,59 +12,69 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Gold400,
-    onPrimary = Color(0xFF2C1904),
-    primaryContainer = Gold600,
-    onPrimaryContainer = Color(0xFFFFE0A3),
-    secondary = AmberBronze,
-    onSecondary = Color.White,
-    secondaryContainer = DeepLeather,
-    onSecondaryContainer = Gold400,
-    tertiary = SecureGreen,
-    onTertiary = Color.Black,
-    background = ObsidianDark,
-    onBackground = WarmOffWhite,
-    surface = ObsidianSurface,
-    onSurface = WarmOffWhite,
-    surfaceVariant = ObsidianCard,
-    onSurfaceVariant = SubtitleMuted,
-    outline = ObsidianBorder
-)
+enum class PixelAccentColor(val label: String, val hex: String, val isDynamic: Boolean = false) {
+    DYNAMIC("Multi-color", "#38BDF8", true),
+    BLUE("Blue", "#1A73E8"),
+    CORAL("Coral", "#F97316"),
+    VIOLET("Violet", "#7C3AED"),
+    MINT("Mint", "#10B981"),
+    AMBER("Amber", "#F59E0B"),
+    ROSE("Rose", "#EC4899")
+}
 
-private val LightColorScheme = lightColorScheme(
-    primary = Gold600,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFFDE4B0),
-    onPrimaryContainer = Color(0xFF331F04),
-    secondary = SaddleBrown,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFF6E8DF),
-    onSecondaryContainer = Color(0xFF3C2010),
-    tertiary = Color(0xFF059669),
-    onTertiary = Color.White,
-    background = Color(0xFFFBF8F4),
-    onBackground = Color(0xFF201A17),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF201A17),
-    surfaceVariant = Color(0xFFF0EAE2),
-    onSurfaceVariant = Color(0xFF5D524A),
-    outline = Color(0xFFD8CEC4)
-)
+fun getPixelColorScheme(darkTheme: Boolean, accent: PixelAccentColor): ColorScheme {
+    val accentColor = Color(android.graphics.Color.parseColor(accent.hex))
+    return if (darkTheme) {
+        darkColorScheme(
+            primary = accentColor,
+            onPrimary = Color(0xFF0F172A),
+            primaryContainer = accentColor.copy(alpha = 0.22f),
+            onPrimaryContainer = Color.White,
+            secondary = accentColor,
+            onSecondary = Color.White,
+            secondaryContainer = Color(0xFF1E293B),
+            onSecondaryContainer = Color.White,
+            background = Color(0xFF0F172A),
+            onBackground = Color(0xFFF8FAFC),
+            surface = Color(0xFF1E293B),
+            onSurface = Color(0xFFF8FAFC),
+            surfaceVariant = Color(0xFF334155),
+            onSurfaceVariant = Color(0xFFCBD5E1),
+            outline = Color(0xFF475569)
+        )
+    } else {
+        lightColorScheme(
+            primary = accentColor,
+            onPrimary = Color.White,
+            primaryContainer = accentColor.copy(alpha = 0.14f),
+            onPrimaryContainer = accentColor,
+            secondary = accentColor,
+            onSecondary = Color.White,
+            secondaryContainer = Color(0xFFF1F5F9),
+            onSecondaryContainer = Color(0xFF0F172A),
+            background = Color(0xFFF8FAFC),
+            onBackground = Color(0xFF0F172A),
+            surface = Color.White,
+            onSurface = Color(0xFF0F172A),
+            surfaceVariant = Color(0xFFF1F5F9),
+            onSurfaceVariant = Color(0xFF475569),
+            outline = Color(0xFFE2E8F0)
+        )
+    }
+}
 
 @Composable
 fun VaultFolioTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Default to curated luxury palette
+    accentColor: PixelAccentColor = PixelAccentColor.BLUE,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
     val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
+        accentColor.isDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        else -> getPixelColorScheme(darkTheme, accentColor)
     }
 
     MaterialTheme(

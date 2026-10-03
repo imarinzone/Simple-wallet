@@ -12,8 +12,8 @@ data class CardEntity(
     val cardNumber: String,
     val expiryDate: String,
     val cvv: String = "",
-    val cardType: String = "VISA", // VISA, MASTERCARD, AMEX, DISCOVER, ID_CARD, LOYALTY, TRANSIT
-    val category: String = "PAYMENT", // PAYMENT, IDENTITY, MEMBERSHIP, TRANSIT
+    val cardType: String = "VISA", // VISA, MASTERCARD, AMEX, DISCOVER, ID_CARD, RC_CARD, VOUCHER, MISC, TRANSIT
+    val category: String = "PAYMENT", // PAYMENT, IDENTITY, VEHICLE, VOUCHER, MEMBERSHIP, MISC
     val bankOrIssuer: String = "",
     val themeColorHex: String = "#1E293B",
     val gradientEndHex: String = "#0F172A",
@@ -24,20 +24,40 @@ data class CardEntity(
     val isFavorite: Boolean = false,
     val slotIndex: Int = 0
 ) {
+    val isPaymentCard: Boolean
+        get() = cardType in listOf("VISA", "MASTERCARD", "AMEX", "DISCOVER")
+
     val maskedNumber: String
         get() {
-            val clean = cardNumber.replace("\\s+".toRegex(), "")
-            return if (clean.length >= 4) {
-                val last4 = clean.takeLast(4)
-                "•••• •••• •••• $last4"
-            } else {
-                cardNumber
+            val clean = cardNumber.trim()
+            return when {
+                clean.isBlank() -> "•••• •••• •••• ••••"
+                isPaymentCard && clean.filter { it.isDigit() }.length >= 4 -> {
+                    val digits = clean.filter { it.isDigit() }
+                    val last4 = digits.takeLast(4)
+                    "•••• •••• •••• $last4"
+                }
+                clean.length > 4 -> {
+                    val prefix = clean.take(2)
+                    val suffix = clean.takeLast(4)
+                    val maskedMiddle = "•".repeat((clean.length - 6).coerceAtLeast(2))
+                    "$prefix $maskedMiddle $suffix"
+                }
+                else -> clean
             }
         }
 
     val formattedNumber: String
         get() {
-            val digits = cardNumber.filter { it.isDigit() }
-            return digits.chunked(4).joinToString(" ")
+            return if (isPaymentCard) {
+                val digits = cardNumber.filter { it.isDigit() }
+                if (digits.length == 15) {
+                    "${digits.take(4)} ${digits.drop(4).take(6)} ${digits.drop(10)}"
+                } else {
+                    digits.chunked(4).joinToString(" ")
+                }
+            } else {
+                cardNumber
+            }
         }
 }

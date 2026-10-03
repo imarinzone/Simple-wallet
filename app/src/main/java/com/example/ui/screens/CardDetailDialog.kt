@@ -1,13 +1,13 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,11 +23,11 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,8 +67,17 @@ fun CardDetailBottomSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
+    var showFullNumber by remember { mutableStateOf(false) }
     var showCvv by remember { mutableStateOf(false) }
     var copiedLabel by remember { mutableStateOf<String?>(null) }
+
+    fun copyToClipboard(label: String, text: String) {
+        if (text.isNotBlank()) {
+            clipboardManager.setText(AnnotatedString(text))
+            haptics?.success()
+            copiedLabel = label
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -80,9 +89,10 @@ fun CardDetailBottomSheet(
         Column(
             modifier = modifier
                 .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 36.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(bottom = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header Row
@@ -91,20 +101,13 @@ fun CardDetailBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = card.title,
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Category: ${card.category}",
-                        color = Color(0xFFE5A93C),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                Text(
+                    text = card.title.ifBlank { "Card Details" },
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
 
                 Row {
                     IconButton(
@@ -128,20 +131,22 @@ fun CardDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 3D Flippable Card
+            // Card Preview (Flat, shadowless)
             CreditCardItem(
                 card = card,
                 haptics = haptics
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Copied notification banner
             if (copiedLabel != null) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
                         .background(Color(0xFF34D399).copy(alpha = 0.2f))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = "✓ $copiedLabel Copied to Clipboard",
@@ -150,74 +155,154 @@ fun CardDetailBottomSheet(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Quick Data Actions: Copy Number & Copy CVV
+            // Quick Data Actions: Separate Copy Number & Copy Name
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
                     onClick = {
-                        clipboardManager.setText(AnnotatedString(card.cardNumber))
-                        haptics?.success()
-                        copiedLabel = "Card Number"
+                        copyToClipboard("Card Number", card.cardNumber)
                     },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                 ) {
-                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Copy Number", fontSize = 12.sp, color = Color.White)
+                    Text("Copy Number", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                if (card.cvv.isNotBlank()) {
+                if (card.cardholderName.isNotBlank()) {
                     OutlinedButton(
                         onClick = {
-                            clipboardManager.setText(AnnotatedString(card.cvv))
-                            haptics?.success()
-                            copiedLabel = "CVV Code"
+                            copyToClipboard("Cardholder Name", card.cardholderName)
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                     ) {
-                        Icon(imageVector = Icons.Default.Security, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Person, contentDescription = null, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Copy CVV", fontSize = 12.sp, color = Color.White)
+                        Text("Copy Name", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
+                }
+            }
+
+            if (card.cvv.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        copyToClipboard("CVV Code", card.cvv)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Icon(imageVector = Icons.Default.Security, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Copy CVV Code", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Detailed Data List
+            // Card Details List with individual Copy buttons and Number Reveal Toggle
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0xFF221C18))
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                DetailRow(label = "Cardholder", value = card.cardholderName.ifBlank { "N/A" })
-                DetailRow(label = "Card Number", value = card.cardNumber, isMonospace = true)
-                DetailRow(label = "Expiration Date", value = card.expiryDate.ifBlank { "N/A" })
-                DetailRow(label = "Security CVV", value = if (showCvv) card.cvv.ifBlank { "N/A" } else "••••", isMonospace = true) {
-                    showCvv = !showCvv
+                // Cardholder Name
+                DetailRowWithActions(
+                    label = if (card.cardType in listOf("ID_CARD", "RC_CARD")) "Holder / Owner" else "Cardholder",
+                    displayValue = card.cardholderName.ifBlank { "N/A" },
+                    onCopy = if (card.cardholderName.isNotBlank()) {
+                        { copyToClipboard("Cardholder Name", card.cardholderName) }
+                    } else null
+                )
+
+                // Card / Document Number (with Unmask / Reveal toggle button)
+                val displayedNumber = if (showFullNumber) {
+                    card.formattedNumber.ifBlank { card.cardNumber }
+                } else {
+                    card.maskedNumber
                 }
-                DetailRow(label = "Issuer / Bank", value = card.bankOrIssuer.ifBlank { "Unknown" })
-                DetailRow(label = "Network Protocol", value = card.cardType)
-                DetailRow(label = "Scan Ingestion", value = card.scannedVia)
-                if (card.nfcTagUid.isNotBlank()) {
-                    DetailRow(label = "NFC Tag UID", value = card.nfcTagUid, isMonospace = true)
+
+                DetailRowWithActions(
+                    label = when (card.cardType) {
+                        "RC_CARD" -> "Vehicle Reg Number"
+                        "ID_CARD" -> "ID / Document Number"
+                        "VOUCHER" -> "Voucher Code"
+                        "MISC" -> "Card Number / ID"
+                        else -> "Card Number"
+                    },
+                    displayValue = displayedNumber,
+                    isMonospace = true,
+                    onToggleVisibility = {
+                        haptics?.cardSelect()
+                        showFullNumber = !showFullNumber
+                    },
+                    isVisibilityOn = showFullNumber,
+                    onCopy = {
+                        copyToClipboard("Card Number", card.cardNumber)
+                    }
+                )
+
+                // Expiration
+                if (card.expiryDate.isNotBlank()) {
+                    DetailRowWithActions(
+                        label = if (card.cardType in listOf("ID_CARD", "RC_CARD")) "Valid Till" else "Expiration",
+                        displayValue = card.expiryDate,
+                        isMonospace = true,
+                        onCopy = { copyToClipboard("Expiry Date", card.expiryDate) }
+                    )
                 }
-                if (card.notes.isNotBlank()) {
-                    DetailRow(label = "Security Notes", value = card.notes)
+
+                // CVV
+                if (card.cvv.isNotBlank()) {
+                    DetailRowWithActions(
+                        label = "CVV",
+                        displayValue = if (showCvv) card.cvv else "•••",
+                        isMonospace = true,
+                        onToggleVisibility = {
+                            haptics?.cardSelect()
+                            showCvv = !showCvv
+                        },
+                        isVisibilityOn = showCvv,
+                        onCopy = { copyToClipboard("CVV Code", card.cvv) }
+                    )
                 }
+
+                // Issuer / Bank / Department
+                if (card.bankOrIssuer.isNotBlank()) {
+                    DetailRowWithActions(
+                        label = if (card.cardType == "RC_CARD") "RTO / Authority" else "Issuer / Bank",
+                        displayValue = card.bankOrIssuer,
+                        onCopy = { copyToClipboard("Issuer", card.bankOrIssuer) }
+                    )
+                }
+
+                // Card Type / Classification
+                DetailRowWithActions(
+                    label = "Card Type",
+                    displayValue = when (card.cardType) {
+                        "RC_CARD" -> "Vehicle Registration (RC)"
+                        "ID_CARD" -> "Identity Document (ID)"
+                        "VOUCHER" -> "Voucher / Gift Card"
+                        "MISC" -> "Miscellaneous Card"
+                        else -> card.cardType
+                    }
+                )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Delete Card Action
             OutlinedButton(
@@ -235,18 +320,20 @@ fun CardDetailBottomSheet(
             ) {
                 Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Remove Card from Wallet", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text("Remove Card", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
     }
 }
 
 @Composable
-private fun DetailRow(
+private fun DetailRowWithActions(
     label: String,
-    value: String,
+    displayValue: String,
     isMonospace: Boolean = false,
-    onToggle: (() -> Unit)? = null
+    onToggleVisibility: (() -> Unit)? = null,
+    isVisibilityOn: Boolean = false,
+    onCopy: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -259,29 +346,50 @@ private fun DetailRow(
             fontSize = 12.sp,
             modifier = Modifier.weight(0.9f)
         )
+
         Row(
-            modifier = Modifier.weight(1.1f),
+            modifier = Modifier.weight(1.3f),
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = value,
+                text = displayValue,
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 fontFamily = if (isMonospace) FontFamily.Monospace else FontFamily.Default,
-                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                modifier = Modifier.weight(1f, fill = false)
             )
-            if (onToggle != null) {
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = Icons.Default.Visibility,
-                    contentDescription = "Toggle",
-                    tint = Color(0xFFE5A93C),
-                    modifier = Modifier
-                        .size(16.dp)
-                        .clickable { onToggle() }
-                )
+
+            if (onToggleVisibility != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = onToggleVisibility,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isVisibilityOn) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = "Toggle Visibility",
+                        tint = Color(0xFFE5A93C),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            if (onCopy != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = onCopy,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy $label",
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
             }
         }
     }

@@ -286,7 +286,7 @@ fun SamsungWalletHomeScreen(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Sync & Cloud Backup", color = Color.White, fontWeight = FontWeight.Medium) },
+                            text = { Text("Backup & Sync", color = Color.White, fontWeight = FontWeight.Medium) },
                             leadingIcon = {
                                 Icon(Icons.Default.Sync, contentDescription = null, tint = Color(0xFF38BDF8))
                             },
@@ -296,7 +296,7 @@ fun SamsungWalletHomeScreen(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Lock Wallet Now", color = Color.White, fontWeight = FontWeight.Medium) },
+                            text = { Text("Lock Wallet", color = Color.White, fontWeight = FontWeight.Medium) },
                             leadingIcon = {
                                 Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF87171))
                             },
@@ -347,14 +347,6 @@ fun SamsungWalletHomeScreen(
                                 color = Color.White,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Tap the button below to add a card via AI camera scan or NFC tap",
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(horizontal = 30.dp),
-                                lineHeight = 18.sp
                             )
                         }
                     }
@@ -446,36 +438,19 @@ fun SamsungWalletHomeScreen(
                                     },
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                // Drag down hint affordance (Samsung Wallet quick handle)
+                                // Minimal subtle drag handle
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.2f))
+                                        .size(width = 36.dp, height = 4.dp)
                                         .clickable {
                                             haptics?.stackExpand()
                                             isVerticalStackMode = true
                                         }
-                                        .padding(horizontal = 14.dp, vertical = 4.dp)
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.KeyboardArrowDown,
-                                            contentDescription = "Drag down to view stacked cards",
-                                            tint = if (cardDragOffset.value > 15f) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.55f),
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .offset(y = if (cardDragOffset.value > 10f) (cardDragOffset.value * 0.08f).dp else 0.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (cardDragOffset.value >= 48f) "Release to open card stack" else "Drag card down for stacked view",
-                                            color = if (cardDragOffset.value > 15f) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.6f),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
+                                )
 
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
 
                                 // ================= 3. HORIZONTAL CARD SLIDER WITH INTERACTIVE PHYSICAL DRAG =================
                                 Box(
@@ -915,48 +890,6 @@ fun SamsungWalletHomeScreen(
                             }
                         }
                     }
-
-                    // Stack mode prompt when no card is selected
-                    if (!isCardSelected && cards.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(28.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(Color.White.copy(alpha = 0.06f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
-                                    .clickable {
-                                        haptics?.cardSelect()
-                                        isCardSelected = true
-                                    }
-                                    .padding(horizontal = 20.dp, vertical = 11.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CreditCard,
-                                        contentDescription = null,
-                                        tint = Color(0xFFE5A93C),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Tap card to select & get details",
-                                        color = Color.White.copy(alpha = 0.75f),
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -1168,10 +1101,6 @@ private fun VerticalStackedCardsView(
                         .fillMaxWidth()
                         .offset(y = topOffset)
                         .zIndex(index.toFloat())
-                        .shadow(
-                            elevation = if (isSelected) 14.dp else 8.dp,
-                            shape = RoundedCornerShape(18.dp)
-                        )
                         .clickable {
                             haptics?.cardDraw()
                             onSelectCard(index)
@@ -1219,23 +1148,7 @@ private fun VerticalStackedCardsView(
             }
         }
 
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Bottom instruction
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color.White.copy(alpha = 0.06f))
-                .padding(horizontal = 18.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = "Tap any card to select • Drag up to collapse",
-                color = Color.White.copy(alpha = 0.65f),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 

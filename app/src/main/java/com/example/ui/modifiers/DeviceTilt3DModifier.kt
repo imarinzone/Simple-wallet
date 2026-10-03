@@ -131,8 +131,8 @@ fun rememberDeviceTiltState(
 fun Modifier.sensor3DTilt(
     tiltState: DeviceTiltState,
     maxTiltDegrees: Float = 14f,
-    baseElevation: Dp = 12.dp,
-    shadowColor: Color = Color.Black.copy(alpha = 0.5f),
+    baseElevation: Dp = 0.dp,
+    shadowColor: Color = Color.Transparent,
     cornerRadius: Dp = 18.dp
 ): Modifier = composed {
     val density = LocalDensity.current
@@ -158,22 +158,9 @@ fun Modifier.sensor3DTilt(
 
     val rotX = -animatedPitch * maxTiltDegrees
     val rotY = animatedRoll * maxTiltDegrees
-
-    // Dynamic shadow calculation
-    val shadowOffsetXPx = with(density) { (animatedRoll * 14.dp.toPx()) }
-    val shadowOffsetYPx = with(density) { (-animatedPitch * 14.dp.toPx() + baseElevation.toPx()) }
     val cornerRadiusPx = with(density) { cornerRadius.toPx() }
 
     this
-        .drawBehind {
-            // Physical light shadow projected opposite the device tilt
-            drawRoundRect(
-                color = shadowColor,
-                topLeft = Offset(shadowOffsetXPx, shadowOffsetYPx),
-                size = size,
-                cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx)
-            )
-        }
         .graphicsLayer {
             rotationX = rotX
             rotationY = rotY

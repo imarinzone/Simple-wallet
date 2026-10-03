@@ -105,8 +105,8 @@ fun CreditCardItem(
             .sensor3DTilt(
                 tiltState = tiltState,
                 maxTiltDegrees = 14f,
-                baseElevation = 14.dp,
-                shadowColor = m3Theme.ambientGlow,
+                baseElevation = 0.dp,
+                shadowColor = Color.Transparent,
                 cornerRadius = 18.dp
             )
             .clip(RoundedCornerShape(18.dp))
@@ -567,7 +567,52 @@ fun CardNetworkLogoBadge(cardType: String, modifier: Modifier = Modifier) {
                     .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = "IDENTIFICATION",
+                    text = "ID CARD",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        "RC_CARD" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF0284C7).copy(alpha = 0.4f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "RC VEHICLE",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        "VOUCHER" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFE5A93C).copy(alpha = 0.4f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "VOUCHER",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        "MISC" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.White.copy(alpha = 0.2f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "MISC",
                     color = Color.White,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold

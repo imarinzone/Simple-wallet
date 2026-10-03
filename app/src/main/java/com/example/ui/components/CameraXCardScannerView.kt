@@ -405,20 +405,42 @@ private fun CardViewfinderOverlay(modifier: Modifier = Modifier) {
         val screenH = maxHeight.value
 
         // Standard credit card aspect ratio is 85.60 mm x 53.98 mm ~= 1.586
-        val cardW = (screenW * 0.88f)
-        val cardH = cardW / 1.586f
+        // Leave room for shutter button at bottom (76dp) and header at top
+        val maxAvailableH = (screenH - 110f).coerceAtLeast(130f)
+        val cardH = (maxAvailableH * 0.72f).coerceAtMost(screenW * 0.85f / 1.586f)
+        val cardW = cardH * 1.586f
 
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 76.dp), // Dedicated clearance for shutter button
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Instruction pill positioned cleanly ABOVE the yellow frame
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Align card edges inside the yellow frame",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             Box(
                 modifier = Modifier
                     .width(cardW.dp)
                     .height(cardH.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .border(2.dp, Color(0xFFE5A93C).copy(alpha = 0.85f), RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(2.dp, Color(0xFFE5A93C).copy(alpha = 0.9f), RoundedCornerShape(16.dp))
             ) {
                 // Animated laser scanner beam
                 Box(
@@ -441,8 +463,8 @@ private fun CardViewfinderOverlay(modifier: Modifier = Modifier) {
 
                 // Corner target brackets
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val bracketLen = 24.dp.toPx()
-                    val strokeW = 4.dp.toPx()
+                    val bracketLen = 22.dp.toPx()
+                    val strokeW = 3.5.dp.toPx()
                     val color = Color(0xFFE5A93C)
 
                     // Top-Left
@@ -461,22 +483,6 @@ private fun CardViewfinderOverlay(modifier: Modifier = Modifier) {
                     drawLine(color, Offset(size.width, size.height), Offset(size.width - bracketLen, size.height), strokeW)
                     drawLine(color, Offset(size.width, size.height), Offset(size.width, size.height - bracketLen), strokeW)
                 }
-            }
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.65f))
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "Align card edges inside the yellow frame",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
             }
         }
     }
