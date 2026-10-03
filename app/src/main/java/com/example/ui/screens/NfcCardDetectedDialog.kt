@@ -1,7 +1,7 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Nfc
@@ -45,6 +46,7 @@ fun NfcCardDetectedDialog(
     card: CardEntity,
     onDismiss: () -> Unit,
     onSaveToWallet: (CardEntity) -> Unit,
+    onScanWithCamera: () -> Unit = {},
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
@@ -60,7 +62,7 @@ fun NfcCardDetectedDialog(
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = 20.dp)
                 .padding(bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -94,7 +96,7 @@ fun NfcCardDetectedDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Card tapped against device antenna",
+                            text = "Authenticated with contactless chip",
                             color = Color(0xFF38BDF8),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -146,16 +148,38 @@ fun NfcCardDetectedDialog(
                         )
                     }
                     Text(
-                        text = "Protocol: ISO/IEC 14443 Type A/B Contactless",
+                        text = "Protocol: ISO/IEC 14443 Type A/B Contactless EMV",
                         color = Color(0xFFCBD5E1),
                         fontSize = 11.sp
                     )
-                    Text(
-                        text = "Action Intent: android.nfc.action.TECH_DISCOVERED",
-                        color = Color(0xFF38BDF8),
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    if (card.notes.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = card.notes,
+                            color = Color(0xFF93C5FD),
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+
+            if (card.cardNumber.isBlank()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                OutlinedButton(
+                    onClick = {
+                        haptics?.cardSelect()
+                        onDismiss()
+                        onScanWithCamera()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
+                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.7f))
+                ) {
+                    Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Scan with Camera OCR to Complete Card Number", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 

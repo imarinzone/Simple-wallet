@@ -112,7 +112,7 @@ fun ScanCardScreen(
     fun processImage(bitmap: Bitmap) {
         capturedBitmap = bitmap
         isAnalyzing = true
-        statusText = "Analyzing card structure using gemini-3.1-pro-preview..."
+        statusText = "Analyzing card with Google ML Kit & Gemini AI OCR..."
         haptics?.cardSlide()
 
         // Extract Material You dynamic color palette from card photo
@@ -129,7 +129,16 @@ fun ScanCardScreen(
                     haptics?.success()
                     scanResultCard = result.card
                     aiModelNotice = "Scanned using ${result.modelUsed}"
-                    statusText = "Card information extracted! Review and adjust below."
+                    statusText = when {
+                        result.card.cardNumber.isNotBlank() && result.card.cardholderName.isNotBlank() ->
+                            "Card number and cardholder name successfully extracted! Review below."
+                        result.card.cardNumber.isNotBlank() ->
+                            "Card number extracted! Please confirm cardholder name below."
+                        result.card.cardholderName.isNotBlank() ->
+                            "Cardholder name extracted! Please verify card number below."
+                        else ->
+                            "Card analyzed! Please enter or confirm any missing fields below."
+                    }
 
                     // Fill form fields
                     title = result.card.title
@@ -431,8 +440,23 @@ fun ScanCardScreen(
 
                     OutlinedTextField(
                         value = cardNumber,
-                        onValueChange = { cardNumber = it },
+                        onValueChange = { input ->
+                            val clean = input.filter { it.isDigit() }.take(19)
+                            cardNumber = if (clean.length == 15) {
+                                "${clean.substring(0, 4)} ${clean.substring(4, 10)} ${clean.substring(10)}"
+                            } else {
+                                clean.chunked(4).joinToString(" ")
+                            }
+                            cardType = when {
+                                clean.startsWith("4") -> "VISA"
+                                clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") || (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
+                                clean.startsWith("34") || clean.startsWith("37") -> "AMEX"
+                                clean.startsWith("6011") || clean.startsWith("65") -> "DISCOVER"
+                                else -> cardType
+                            }
+                        },
                         label = { Text("Card Number") },
+                        placeholder = { Text("16-digit card number") },
                         modifier = Modifier.fillMaxWidth(),
                         colors = fieldColors,
                         singleLine = true
@@ -443,8 +467,9 @@ fun ScanCardScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(
                             value = cardholderName,
-                            onValueChange = { cardholderName = it },
+                            onValueChange = { cardholderName = it.uppercase() },
                             label = { Text("Cardholder Name") },
+                            placeholder = { Text("NAME ON CARD") },
                             modifier = Modifier.weight(1f),
                             colors = fieldColors,
                             singleLine = true
@@ -452,8 +477,14 @@ fun ScanCardScreen(
 
                         OutlinedTextField(
                             value = expiryDate,
-                            onValueChange = { expiryDate = it },
+                            onValueChange = { input ->
+                                val digits = input.filter { it.isDigit() }.take(4)
+                                expiryDate = if (digits.length >= 3) {
+                                    "${digits.substring(0, 2)}/${digits.substring(2)}"
+                                } else digits
+                            },
                             label = { Text("Expiry (MM/YY)") },
+                            placeholder = { Text("12/28") },
                             modifier = Modifier.weight(0.7f),
                             colors = fieldColors,
                             singleLine = true
@@ -461,8 +492,9 @@ fun ScanCardScreen(
 
                         OutlinedTextField(
                             value = cvv,
-                            onValueChange = { cvv = it },
+                            onValueChange = { cvv = it.filter { c -> c.isDigit() }.take(4) },
                             label = { Text("CVV") },
+                            placeholder = { Text("•••") },
                             modifier = Modifier.weight(0.5f),
                             colors = fieldColors,
                             singleLine = true

@@ -238,6 +238,7 @@ fun MainAppContent(
                     NfcScanScreen(
                         onNavigateBack = { viewModel.navigateTo(AppScreen.WALLET_HOME) },
                         onCardSaved = { viewModel.saveCard(it) },
+                        onNavigateToCameraScan = { viewModel.navigateTo(AppScreen.SCAN_CAMERA) },
                         haptics = haptics
                     )
                 }
@@ -295,6 +296,10 @@ fun MainAppContent(
                     onSaveToWallet = {
                         viewModel.saveCard(it)
                         viewModel.dismissPhysicalNfcCardPrompt()
+                    },
+                    onScanWithCamera = {
+                        viewModel.dismissPhysicalNfcCardPrompt()
+                        viewModel.navigateTo(AppScreen.SCAN_CAMERA)
                     },
                     haptics = haptics
                 )

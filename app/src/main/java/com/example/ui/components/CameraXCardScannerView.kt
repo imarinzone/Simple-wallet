@@ -334,11 +334,23 @@ fun CameraXCardScannerView(
                                                 rawBitmap
                                             }
 
+                                            // Crop to card area corresponding to viewfinder reticle with margin
+                                            val cropWidth = (finalBitmap.width * 0.92f).toInt().coerceAtMost(finalBitmap.width)
+                                            val cropHeight = (cropWidth / 1.586f).toInt().coerceAtMost(finalBitmap.height)
+                                            val cropX = ((finalBitmap.width - cropWidth) / 2).coerceAtLeast(0)
+                                            val cropY = ((finalBitmap.height - cropHeight) / 2).coerceAtLeast(0)
+
+                                            val cardRegionBitmap = try {
+                                                Bitmap.createBitmap(finalBitmap, cropX, cropY, cropWidth, cropHeight)
+                                            } catch (e: Exception) {
+                                                finalBitmap
+                                            }
+
                                             imageProxy.close()
 
                                             ContextCompat.getMainExecutor(context).execute {
                                                 isCapturing = false
-                                                onCardImageCaptured(finalBitmap)
+                                                onCardImageCaptured(cardRegionBitmap)
                                             }
                                         } catch (e: Exception) {
                                             imageProxy.close()

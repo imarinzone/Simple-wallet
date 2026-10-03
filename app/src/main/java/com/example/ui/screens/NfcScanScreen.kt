@@ -7,10 +7,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,9 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Contactless
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.ButtonDefaults
@@ -39,13 +37,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,9 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -74,6 +71,7 @@ import com.example.ui.components.CreditCardItem
 fun NfcScanScreen(
     onNavigateBack: () -> Unit,
     onCardSaved: (CardEntity) -> Unit,
+    onNavigateToCameraScan: () -> Unit = {},
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
@@ -83,7 +81,14 @@ fun NfcScanScreen(
 
     var readResult by remember { mutableStateOf<NfcReadResult?>(null) }
     var detectedCard by remember { mutableStateOf<CardEntity?>(null) }
-    var isReading by remember { mutableStateOf(false) }
+
+    // Verification fields editable by user
+    var cardTitle by remember { mutableStateOf("") }
+    var cardNumber by remember { mutableStateOf("") }
+    var cardholderName by remember { mutableStateOf("") }
+    var expiryDate by remember { mutableStateOf("") }
+    var bankOrIssuer by remember { mutableStateOf("") }
+    var cardType by remember { mutableStateOf("VISA") }
 
     // Start real NFC hardware listener
     DisposableEffect(Unit) {
@@ -92,6 +97,15 @@ fun NfcScanScreen(
                 haptics?.success()
                 readResult = result
                 detectedCard = result.suggestedCard
+
+                result.suggestedCard?.let { card ->
+                    cardTitle = card.title
+                    cardNumber = card.cardNumber
+                    cardholderName = card.cardholderName
+                    expiryDate = card.expiryDate
+                    bankOrIssuer = card.bankOrIssuer
+                    cardType = card.cardType
+                }
             }
         }
         onDispose {
@@ -145,6 +159,15 @@ fun NfcScanScreen(
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    IconButton(onClick = onNavigateToCameraScan) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Switch to Camera OCR",
+                            tint = Color(0xFF38BDF8)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFF0F172A),
                     titleContentColor = Color.White,
@@ -164,32 +187,32 @@ fun NfcScanScreen(
         ) {
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Radar Pulse NFC Animation Box
+            // Animated NFC Pulse Radar
             Box(
-                modifier = Modifier
-                    .size(240.dp),
+                modifier = Modifier.size(160.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Outer Concentric Waves
+                // Outer wave
                 Box(
                     modifier = Modifier
-                        .size(220.dp)
-                        .scale(waveScale)
+                        .size((140 * waveScale).dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF38BDF8).copy(alpha = waveAlpha * 0.3f))
-                )
-                Box(
-                    modifier = Modifier
-                        .size(160.dp)
-                        .scale(waveScale * 0.9f)
-                        .clip(CircleShape)
-                        .background(Color(0xFF0284C7).copy(alpha = waveAlpha * 0.5f))
+                        .background(Color(0xFF38BDF8).copy(alpha = waveAlpha))
                 )
 
-                // Center NFC Pad
+                // Middle ring
                 Box(
                     modifier = Modifier
-                        .size(110.dp)
+                        .size(118.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0284C7).copy(alpha = 0.35f))
+                        .border(1.5.dp, Color(0xFF38BDF8).copy(alpha = 0.6f), CircleShape)
+                )
+
+                // Core NFC antenna sensor icon
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
                         .shadow(16.dp, CircleShape)
                         .clip(CircleShape)
                         .background(
@@ -208,34 +231,36 @@ fun NfcScanScreen(
                         imageVector = Icons.Default.Sensors,
                         contentDescription = "NFC Sensor",
                         tint = Color.White,
-                        modifier = Modifier.size(54.dp)
+                        modifier = Modifier.size(46.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = if (detectedCard != null) "CARD DETECTED VIA NFC" else "READY TO SCAN",
                 color = if (detectedCard != null) Color(0xFF34D399) else Color(0xFF38BDF8),
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp
+                letterSpacing = 1.5.sp
             )
 
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = if (detectedCard != null)
-                    "Contactless ISO-14443 tag UID: ${readResult?.tagUidHex ?: "READ_OK"}"
+                    (readResult?.detailsMessage?.ifBlank { "Contactless ISO-14443 EMV Card Read" } ?: "Contactless Card Read")
                 else
-                    "Hold any contactless payment card or transit card firmly against the back of your device",
+                    "Hold any physical credit card, debit card, or transit card firmly against the back of your device",
                 color = Color.White.copy(alpha = 0.75f),
-                fontSize = 13.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                fontSize = 12.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 17.sp,
+                modifier = Modifier.padding(horizontal = 8.dp)
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Real NFC Hardware Status & Guidance Card
             Box(
@@ -244,43 +269,46 @@ fun NfcScanScreen(
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color(0xFF1E293B).copy(alpha = 0.6f))
                     .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
+                    .padding(14.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF34D399))
+                            .background(if (nfcManager.isNfcEnabled) Color(0xFF34D399) else Color(0xFFF87171))
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "NFC ANTENNA ACTIVE",
-                            color = Color(0xFF38BDF8),
+                            text = if (nfcManager.isNfcEnabled) "HARDWARE NFC ANTENNA ACTIVE" else "NFC DISABLED IN SYSTEM SETTINGS",
+                            color = if (nfcManager.isNfcEnabled) Color(0xFF38BDF8) else Color(0xFFF87171),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "ISO/IEC 14443 Type A & B Contactless Reader listening at 13.56 MHz. Hold card steadily near the top back of your device.",
+                            text = if (nfcManager.isNfcEnabled)
+                                "ISO/IEC 14443 Type A & B Contactless EMV Reader active. Hold card near top back of device."
+                            else
+                                "Please enable NFC in your device settings to tap and read cards.",
                             color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Display Detected Card
+            // Display Detected Card with Verification & Editing
             AnimatedVisibility(visible = detectedCard != null) {
                 if (detectedCard != null) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "EXTRACTED NFC CARD",
+                            text = "EXTRACTED CARD DETAILS",
                             color = Color(0xFF38BDF8),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -289,12 +317,129 @@ fun NfcScanScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        // Dynamic live preview card
                         CreditCardItem(
-                            card = detectedCard!!,
+                            card = CardEntity(
+                                title = cardTitle.ifBlank { "NFC Card" },
+                                cardholderName = cardholderName.ifBlank { "CARDHOLDER" },
+                                cardNumber = cardNumber.ifBlank { "•••• •••• •••• ••••" },
+                                expiryDate = expiryDate.ifBlank { "••/••" },
+                                cvv = "",
+                                cardType = cardType,
+                                bankOrIssuer = bankOrIssuer.ifBlank { "Contactless" },
+                                themeColorHex = detectedCard!!.themeColorHex,
+                                gradientEndHex = detectedCard!!.gradientEndHex,
+                                nfcTagUid = detectedCard!!.nfcTagUid,
+                                scannedVia = "NFC"
+                            ),
                             haptics = haptics
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Prompt to use Camera OCR if PAN is restricted by the issuing bank's chip
+                        if (cardNumber.isBlank() || readResult?.hasFullCardNumber == false) {
+                            OutlinedButton(
+                                onClick = {
+                                    haptics?.cardSelect()
+                                    onNavigateToCameraScan()
+                                },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
+                                border = BorderStroke(1.dp, Color(0xFF38BDF8))
+                            ) {
+                                Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Scan with Camera OCR to Fill Details", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
+
+                        // Editable verification form
+                        val fieldColors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF38BDF8),
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedLabelColor = Color(0xFF38BDF8),
+                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
+                        )
+
+                        OutlinedTextField(
+                            value = cardTitle,
+                            onValueChange = { cardTitle = it },
+                            label = { Text("Card Label") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = fieldColors,
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = cardNumber,
+                            onValueChange = { input ->
+                                val clean = input.filter { it.isDigit() }.take(19)
+                                cardNumber = if (clean.length == 15) {
+                                    "${clean.substring(0, 4)} ${clean.substring(4, 10)} ${clean.substring(10)}"
+                                } else {
+                                    clean.chunked(4).joinToString(" ")
+                                }
+                                cardType = when {
+                                    clean.startsWith("4") -> "VISA"
+                                    clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") || (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
+                                    clean.startsWith("34") || clean.startsWith("37") -> "AMEX"
+                                    clean.startsWith("6011") || clean.startsWith("65") -> "DISCOVER"
+                                    else -> cardType
+                                }
+                            },
+                            label = { Text("Card Number") },
+                            placeholder = { Text("16-digit card number") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = fieldColors,
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = cardholderName,
+                                onValueChange = { cardholderName = it.uppercase() },
+                                label = { Text("Cardholder Name") },
+                                placeholder = { Text("NAME ON CARD") },
+                                modifier = Modifier.weight(1.3f),
+                                colors = fieldColors,
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = expiryDate,
+                                onValueChange = { expiryDate = it },
+                                label = { Text("Expiry (MM/YY)") },
+                                placeholder = { Text("12/28") },
+                                modifier = Modifier.weight(0.9f),
+                                colors = fieldColors,
+                                singleLine = true
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = bankOrIssuer,
+                            onValueChange = { bankOrIssuer = it },
+                            label = { Text("Bank / Issuer") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = fieldColors,
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // NFC Diagnostic Specs Box
                         Box(
@@ -302,11 +447,11 @@ fun NfcScanScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color(0xFF1E293B))
-                                .padding(14.dp)
+                                .padding(12.dp)
                         ) {
                             Column {
                                 Text(
-                                    text = "NFC PAYLOAD TELEMETRY",
+                                    text = "NFC TELEMETRY",
                                     color = Color(0xFF94A3B8),
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
@@ -315,19 +460,17 @@ fun NfcScanScreen(
                                 Text(
                                     text = "UID: ${readResult?.tagUidHex ?: "UNKNOWN"}",
                                     color = Color.White,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace
                                 )
-                                Text(
-                                    text = "Protocol: ISO/IEC 14443 Type A (106 kbps)",
-                                    color = Color(0xFFCBD5E1),
-                                    fontSize = 11.sp
-                                )
-                                Text(
-                                    text = "EMV AID: ${readResult?.emvAid ?: "PPSE 2PAY.SYS.DDF01"}",
-                                    color = Color(0xFFCBD5E1),
-                                    fontSize = 11.sp
-                                )
+                                if (readResult?.emvAid?.isNotBlank() == true) {
+                                    Text(
+                                        text = "EMV AID: ${readResult?.emvAid}",
+                                        color = Color(0xFFCBD5E1),
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
                             }
                         }
 
@@ -335,23 +478,31 @@ fun NfcScanScreen(
 
                         ElevatedButton(
                             onClick = {
+                                val finalCard = detectedCard!!.copy(
+                                    title = cardTitle.ifBlank { "${bankOrIssuer.ifBlank { cardType }} Card" },
+                                    cardNumber = cardNumber,
+                                    cardholderName = cardholderName.uppercase(),
+                                    expiryDate = expiryDate,
+                                    bankOrIssuer = bankOrIssuer.ifBlank { cardType },
+                                    cardType = cardType
+                                )
                                 haptics?.success()
-                                onCardSaved(detectedCard!!)
+                                onCardSaved(finalCard)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp),
+                                .height(50.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.elevatedButtonColors(
                                 containerColor = Color(0xFF0284C7),
                                 contentColor = Color.White
                             )
                         ) {
-                            Icon(imageVector = Icons.Default.Check, contentDescription = null)
+                            Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Store Card in Wallet",
-                                fontSize = 16.sp,
+                                text = "Save to Secured Wallet",
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }

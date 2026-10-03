@@ -53,6 +53,9 @@
                 android:resource="@xml/nfc_tech_filter" />
         </activity>
 
+        <meta-data
+            android:name="com.google.ml.vision.DEPENDENCIES"
+            android:value="ocr" />
     </application>
 
 </manifest>
