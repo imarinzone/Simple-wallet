@@ -5,18 +5,34 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Base Gradient Canvas (Royal Blue to Vibrant Violet) -->
     <path android:pathData="M0,0h108v108h-108z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:angle="315"
-                android:endColor="#181513"
-                android:startColor="#2C2117"
+                android:startColor="#2563EB"
+                android:centerColor="#4F46E5"
+                android:endColor="#7C3AED"
                 android:type="linear" />
         </aapt:attr>
     </path>
-    <!-- Subtle circular radial glow -->
+
+    <!-- Top-Left Ambient Cyan Highlight -->
     <path
-        android:fillAlpha="0.25"
-        android:fillColor="#E5A93C"
-        android:pathData="M54,54m-42,0a42,42 0 1,0 84,0a42,42 0 1,0 -84,0" />
+        android:fillAlpha="0.22"
+        android:fillColor="#38BDF8"
+        android:pathData="M20,20m-36,0a36,36 0 1,0 72,0a36,36 0 1,0 -72,0" />
+
+    <!-- Bottom-Right Warm Magenta Glow Accent -->
+    <path
+        android:fillAlpha="0.18"
+        android:fillColor="#E879F9"
+        android:pathData="M88,88m-32,0a32,32 0 1,0 64,0a32,32 0 1,0 -64,0" />
+
+    <!-- Subtle Diagonal Sheen -->
+    <path
+        android:fillAlpha="0.06"
+        android:fillColor="#FFFFFF"
+        android:pathData="M0,0 L108,0 L108,108 Z" />
 </vector>
