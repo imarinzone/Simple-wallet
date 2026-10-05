@@ -404,37 +404,42 @@ private fun CardViewfinderOverlay(modifier: Modifier = Modifier) {
         val screenW = maxWidth.value
         val screenH = maxHeight.value
 
-        // Standard credit card aspect ratio is 85.60 mm x 53.98 mm ~= 1.586
-        // Leave room for shutter button at bottom (76dp) and header at top
-        val maxAvailableH = (screenH - 110f).coerceAtLeast(130f)
-        val cardH = (maxAvailableH * 0.72f).coerceAtMost(screenW * 0.85f / 1.586f)
+        // Dedicated room for shutter button at bottom (~90dp) and top header/pill (~55dp)
+        val availableH = (screenH - 145f).coerceAtLeast(100f)
+        val cardH = (availableH * 0.82f).coerceAtMost(screenW * 0.86f / 1.586f)
         val cardW = cardH * 1.586f
 
-        Column(
+        // Instruction pill placed cleanly at the TOP — never over the yellow frame or shutter button
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 76.dp), // Dedicated clearance for shutter button
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .fillMaxWidth()
+                .padding(top = 16.dp)
+                .align(Alignment.TopCenter),
+            contentAlignment = Alignment.Center
         ) {
-            // Instruction pill positioned cleanly ABOVE the yellow frame
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 7.dp)
             ) {
                 Text(
                     text = "Align card edges inside the yellow frame",
                     color = Color.White,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
+        // Yellow frame centered in the vertical space between top instruction and bottom shutter
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 50.dp, bottom = 96.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Box(
                 modifier = Modifier
                     .width(cardW.dp)

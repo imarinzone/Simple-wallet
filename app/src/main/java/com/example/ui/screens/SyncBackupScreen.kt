@@ -21,20 +21,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -57,6 +58,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CardEntity
@@ -76,10 +79,25 @@ fun SyncBackupScreen(
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
 
+    var exportPassphrase by remember { mutableStateOf("") }
+    var showExportPassphrase by remember { mutableStateOf(false) }
+
+    var importPassphrase by remember { mutableStateOf("") }
+    var showImportPassphrase by remember { mutableStateOf(false) }
+
     var generatedBackupPayload by remember { mutableStateOf<String?>(null) }
     var importInputText by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var isSuccess by remember { mutableStateOf(false) }
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        focusedLabelColor = MaterialTheme.colorScheme.primary,
+        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 
     Scaffold(
         topBar = {
@@ -89,7 +107,7 @@ fun SyncBackupScreen(
                         Icon(
                             imageVector = Icons.Default.Sync,
                             contentDescription = null,
-                            tint = Color(0xFF34D399),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -106,13 +124,13 @@ fun SyncBackupScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF13100E),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
-        containerColor = Color(0xFF13100E)
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = modifier
@@ -122,61 +140,106 @@ fun SyncBackupScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (statusMessage != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSuccess) Color(0xFF065F46) else Color(0xFF7F1D1D))
+                        .background(
+                            if (isSuccess) Color(0xFF059669).copy(alpha = 0.2f)
+                            else Color(0xFFDC2626).copy(alpha = 0.2f)
+                        )
+                        .border(
+                            1.dp,
+                            if (isSuccess) Color(0xFF059669) else Color(0xFFDC2626),
+                            RoundedCornerShape(10.dp)
+                        )
                         .padding(12.dp)
                 ) {
                     Text(
                         text = statusMessage ?: "",
-                        color = Color.White,
-                        fontSize = 12.sp,
+                        color = if (isSuccess) Color(0xFF10B981) else Color(0xFFEF4444),
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
-            // SECTION 1: EXPORT
+            // SECTION 1: EXPORT (AES-GCM ENCRYPTED)
             Text(
-                text = "Export Backup",
-                color = Color(0xFFE5A93C),
-                fontSize = 13.sp,
+                text = "Export Encrypted Backup",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.Start)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Securely encrypt all cards using your personal secret passphrase.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                modifier = Modifier.align(Alignment.Start)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = exportPassphrase,
+                onValueChange = { exportPassphrase = it },
+                label = { Text("Encryption Passphrase") },
+                placeholder = { Text("Enter a secret passphrase") },
+                visualTransformation = if (showExportPassphrase) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showExportPassphrase = !showExportPassphrase }) {
+                        Icon(
+                            imageVector = if (showExportPassphrase) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = "Toggle Passphrase Visibility",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = fieldColors,
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             ElevatedButton(
                 onClick = {
+                    if (exportPassphrase.isBlank()) {
+                        statusMessage = "Please enter an encryption passphrase"
+                        isSuccess = false
+                        return@ElevatedButton
+                    }
                     coroutineScope.launch {
-                        val json = repository.exportBackupJson(cards)
-                        generatedBackupPayload = json
-                        clipboardManager.setText(AnnotatedString(json))
+                        val encryptedJson = repository.exportEncryptedBackupJson(cards, exportPassphrase)
+                        generatedBackupPayload = encryptedJson
+                        clipboardManager.setText(AnnotatedString(encryptedJson))
                         haptics?.success()
-                        statusMessage = "Backup copied to clipboard"
+                        statusMessage = "Encrypted backup created and copied to clipboard"
                         isSuccess = true
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
+                    .height(48.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.elevatedButtonColors(
-                    containerColor = Color(0xFFE5A93C),
-                    contentColor = Color(0xFF261502)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(imageVector = Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (cards.isEmpty()) "Generate Backup Code" else "Generate Backup Code (${cards.size})",
+                    text = if (cards.isEmpty()) "Generate Encrypted Backup" else "Generate Encrypted Backup (${cards.size})",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     maxLines = 1
@@ -190,14 +253,14 @@ fun SyncBackupScreen(
                             .fillMaxWidth()
                             .height(130.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF1A1715))
-                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                             .padding(10.dp)
                     ) {
                         Text(
                             text = generatedBackupPayload ?: "",
-                            color = Color(0xFFF3C569),
-                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             modifier = Modifier.verticalScroll(rememberScrollState())
                         )
@@ -210,7 +273,7 @@ fun SyncBackupScreen(
                             if (generatedBackupPayload != null) {
                                 clipboardManager.setText(AnnotatedString(generatedBackupPayload!!))
                                 haptics?.success()
-                                statusMessage = "Backup copied to clipboard"
+                                statusMessage = "Encrypted backup copied to clipboard"
                                 isSuccess = true
                             }
                         },
@@ -219,7 +282,7 @@ fun SyncBackupScreen(
                     ) {
                         Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Copy Code", fontSize = 11.sp, color = Color.White)
+                        Text("Copy Code", fontSize = 12.sp)
                     }
                 }
             }
@@ -228,35 +291,60 @@ fun SyncBackupScreen(
 
             // SECTION 2: RESTORE
             Text(
-                text = "Restore Backup",
-                color = Color(0xFF38BDF8),
-                fontSize = 13.sp,
+                text = "Restore Encrypted Backup",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.Start)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Paste backup code and enter your secret passphrase to decrypt and restore.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                modifier = Modifier.align(Alignment.Start)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             OutlinedTextField(
                 value = importInputText,
                 onValueChange = { importInputText = it },
-                label = { Text("Backup Code") },
-                placeholder = { Text("{\"version\": 1, \"cards\": [...]}") },
+                label = { Text("Backup Payload") },
+                placeholder = { Text("Paste encrypted VaultFolio JSON code here") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp),
+                    .height(110.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF38BDF8),
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedLabelColor = Color(0xFF38BDF8),
-                    unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
-                )
+                colors = fieldColors
             )
 
             Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = importPassphrase,
+                onValueChange = { importPassphrase = it },
+                label = { Text("Decryption Passphrase") },
+                placeholder = { Text("Enter passphrase used during export") },
+                visualTransformation = if (showImportPassphrase) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showImportPassphrase = !showImportPassphrase }) {
+                        Icon(
+                            imageVector = if (showImportPassphrase) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = "Toggle Passphrase Visibility",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = fieldColors,
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -270,51 +358,51 @@ fun SyncBackupScreen(
                             haptics?.cardSelect()
                         }
                     },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(imageVector = Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Paste", fontSize = 12.sp, color = Color.White, maxLines = 1)
+                    Text("Paste", fontSize = 13.sp)
                 }
 
                 ElevatedButton(
                     onClick = {
                         if (importInputText.isBlank()) {
-                            statusMessage = "Please paste a backup code"
+                            statusMessage = "Please paste backup code"
                             isSuccess = false
                             return@ElevatedButton
                         }
+
                         coroutineScope.launch {
-                            val result = repository.restoreBackupJson(importInputText, replaceExisting = false)
+                            val result = repository.restoreEncryptedBackupJson(
+                                payload = importInputText,
+                                passphrase = importPassphrase,
+                                replaceExisting = false
+                            )
                             result.onSuccess { count ->
                                 haptics?.success()
-                                statusMessage = "Restored $count cards"
+                                statusMessage = "Successfully decrypted and restored $count card(s)"
                                 isSuccess = true
                                 importInputText = ""
+                                importPassphrase = ""
                             }.onFailure { err ->
                                 haptics?.error()
-                                statusMessage = "Restore failed: ${err.message}"
+                                statusMessage = err.message ?: "Failed to decrypt backup"
                                 isSuccess = false
                             }
                         }
                     },
-                    modifier = Modifier
-                        .weight(1.5f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.weight(1.3f).height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
-                        containerColor = Color(0xFF0284C7),
-                        contentColor = Color.White
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Restore Cards", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("Decrypt & Restore", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
 

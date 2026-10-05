@@ -65,7 +65,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _showLockSuggestionDialog = MutableStateFlow(!_hasSuggestedLock.value && !_isBiometricEnabled.value)
     val showLockSuggestionDialog: StateFlow<Boolean> = _showLockSuggestionDialog.asStateFlow()
 
-    private val _masterPin = MutableStateFlow(prefs.getString("pref_master_pin", "1234") ?: "1234")
+    private val _masterPin = MutableStateFlow(prefs.getString("pref_master_pin", "") ?: "")
     val masterPin: StateFlow<String> = _masterPin.asStateFlow()
 
     private val _themeMode = MutableStateFlow(
@@ -103,6 +103,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _scannedPhysicalCard = MutableStateFlow<CardEntity?>(null)
     val scannedPhysicalCard: StateFlow<CardEntity?> = _scannedPhysicalCard.asStateFlow()
+
+    // Setting Flag: Fetch actual card artwork from the internet (default false / turned off as requested)
+    private val _isOnlineCardArtEnabled = MutableStateFlow(prefs.getBoolean("pref_online_card_art", false))
+    val isOnlineCardArtEnabled: StateFlow<Boolean> = _isOnlineCardArtEnabled.asStateFlow()
+
+    private val _selectedCardForEdit = MutableStateFlow<CardEntity?>(null)
+    val selectedCardForEdit: StateFlow<CardEntity?> = _selectedCardForEdit.asStateFlow()
 
     init {
         haptics.sensitivity = _hapticSensitivity.value
@@ -222,5 +229,49 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         haptics.sensitivity = sensitivity
         prefs.edit().putString("pref_haptic_sensitivity", sensitivity.name).apply()
         haptics.cardSelect()
+    }
+
+    fun toggleOnlineCardArt(enabled: Boolean) {
+        _isOnlineCardArtEnabled.value = enabled
+        prefs.edit().putBoolean("pref_online_card_art", enabled).apply()
+    }
+
+    fun openCardEdit(card: CardEntity) {
+        _selectedCardForEdit.value = card
+    }
+
+    fun closeCardEdit() {
+        _selectedCardForEdit.value = null
+    }
+
+    fun updateCard(updatedCard: CardEntity) {
+        viewModelScope.launch {
+            repository.saveCard(updatedCard)
+            if (_selectedCardForDetail.value?.id == updatedCard.id) {
+                _selectedCardForDetail.value = updatedCard
+            }
+            if (_selectedCardForEdit.value?.id == updatedCard.id) {
+                _selectedCardForEdit.value = null
+            }
+            haptics.success()
+        }
+    }
+
+    fun updateCardArtwork(card: CardEntity, artworkUrl: String, primaryColorHex: String? = null, gradientEndHex: String? = null) {
+        viewModelScope.launch {
+            val updated = card.copy(
+                cardArtUrl = artworkUrl,
+                themeColorHex = primaryColorHex ?: card.themeColorHex,
+                gradientEndHex = gradientEndHex ?: card.gradientEndHex
+            )
+            repository.saveCard(updated)
+            if (_selectedCardForDetail.value?.id == card.id) {
+                _selectedCardForDetail.value = updated
+            }
+            if (_selectedCardForEdit.value?.id == card.id) {
+                _selectedCardForEdit.value = updated
+            }
+            haptics.success()
+        }
     }
 }

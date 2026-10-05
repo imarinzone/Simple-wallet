@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sensors
@@ -39,6 +41,7 @@ import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -64,13 +67,43 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.CardArtOnlineService
 import com.example.data.CardEntity
 import com.example.nfc.NfcCardReaderManager
 import com.example.nfc.NfcReadResult
 import com.example.security.HapticsHelper
 import com.example.ui.components.CreditCardItem
+
+class NfcExpiryDateVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val trimmed = if (text.text.length >= 4) text.text.substring(0, 4) else text.text
+        var out = ""
+        for (i in trimmed.indices) {
+            out += trimmed[i]
+            if (i == 1 && trimmed.length > 2) out += "/"
+        }
+
+        val offsetTranslator = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 1) return offset
+                if (offset <= 4) return offset + 1
+                return 5
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (offset <= 2) return offset
+                if (offset <= 5) return offset - 1
+                return 4
+            }
+        }
+        return TransformedText(AnnotatedString(out), offsetTranslator)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +111,8 @@ fun NfcScanScreen(
     onNavigateBack: () -> Unit,
     onCardSaved: (CardEntity) -> Unit,
     onNavigateToCameraScan: () -> Unit = {},
+    isOnlineCardArtEnabled: Boolean = false,
+    onEnableOnlineCardArt: () -> Unit = {},
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
@@ -92,10 +127,11 @@ fun NfcScanScreen(
     var cardTitle by remember { mutableStateOf("") }
     var rawCardNumber by remember { mutableStateOf("") }
     var cardholderName by remember { mutableStateOf("") }
-    var expiryDate by remember { mutableStateOf("") }
+    var rawExpiryDigits by remember { mutableStateOf("") }
     var cvv by remember { mutableStateOf("") }
     var bankOrIssuer by remember { mutableStateOf("") }
     var cardType by remember { mutableStateOf("VISA") }
+    var cardArtUrl by remember { mutableStateOf("") }
     var showFullNumber by remember { mutableStateOf(false) }
     var copiedLabel by remember { mutableStateOf<String?>(null) }
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
@@ -106,6 +142,21 @@ fun NfcScanScreen(
             haptics?.success()
             copiedLabel = label
         }
+    }
+
+    fun copyAllCardDetails() {
+        val details = buildString {
+            appendLine("Title: ${cardTitle.ifBlank { "Card" }}")
+            if (rawCardNumber.isNotBlank()) appendLine("Card Number: $rawCardNumber")
+            if (cardholderName.isNotBlank()) appendLine("Cardholder: $cardholderName")
+            val exp = if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}" else rawExpiryDigits
+            if (exp.isNotBlank()) appendLine("Expiry: $exp")
+            if (cvv.isNotBlank()) appendLine("CVV: $cvv")
+            if (bankOrIssuer.isNotBlank()) appendLine("Issuer / Bank: $bankOrIssuer")
+            appendLine("Card Type: $cardType")
+            if (detectedCard?.nfcTagUid?.isNotBlank() == true) appendLine("NFC Tag UID: ${detectedCard?.nfcTagUid}")
+        }.trim()
+        copyToClipboard("All Info", details)
     }
 
     // Start real NFC hardware listener
@@ -120,9 +171,15 @@ fun NfcScanScreen(
                     cardTitle = card.title
                     rawCardNumber = card.cardNumber.replace("\\s+".toRegex(), "")
                     cardholderName = card.cardholderName
-                    expiryDate = card.expiryDate
+                    rawExpiryDigits = card.expiryDate.filter { it.isDigit() }
                     bankOrIssuer = card.bankOrIssuer
                     cardType = card.cardType
+                    if (isOnlineCardArtEnabled) {
+                        val suggested = CardArtOnlineService.suggestArtForCard(card)
+                        if (suggested != null) {
+                            cardArtUrl = suggested.imageUrl
+                        }
+                    }
                 }
             }
         }
@@ -187,13 +244,13 @@ fun NfcScanScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0F172A),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
-        containerColor = Color(0xFF0F172A)
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = modifier
@@ -296,19 +353,24 @@ fun NfcScanScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Dynamic live preview card
+                        val previewExpiry = if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
+                        else if (rawExpiryDigits.length >= 2) "${rawExpiryDigits.take(2)}/"
+                        else rawExpiryDigits.ifBlank { "••/••" }
+
                         CreditCardItem(
                             card = CardEntity(
                                 title = cardTitle.ifBlank { "${bankOrIssuer.ifBlank { cardType }} Card" },
                                 cardholderName = cardholderName.ifBlank { "CARDHOLDER" },
                                 cardNumber = rawCardNumber.ifBlank { "•••• •••• •••• ••••" },
-                                expiryDate = expiryDate.ifBlank { "••/••" },
+                                expiryDate = previewExpiry,
                                 cvv = cvv,
                                 cardType = cardType,
                                 bankOrIssuer = bankOrIssuer.ifBlank { "Contactless" },
                                 themeColorHex = detectedCard!!.themeColorHex,
                                 gradientEndHex = detectedCard!!.gradientEndHex,
                                 nfcTagUid = detectedCard!!.nfcTagUid,
-                                scannedVia = "NFC"
+                                scannedVia = "NFC",
+                                cardArtUrl = cardArtUrl
                             ),
                             haptics = haptics
                         )
@@ -334,40 +396,78 @@ fun NfcScanScreen(
                             Spacer(modifier = Modifier.height(10.dp))
                         }
 
-                        // Quick Data Actions: Copy Number & Copy Name
-                        if (rawCardNumber.isNotBlank() || cardholderName.isNotBlank()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // Quick Data Actions: Scrollable row with Copy All Info, Copy Number, Copy Name, Copy Expiry, Copy CVV
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { copyAllCardDetails() },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
                             ) {
-                                if (rawCardNumber.isNotBlank()) {
-                                    OutlinedButton(
-                                        onClick = { copyToClipboard("Card Number", rawCardNumber) },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                                    ) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Copy Number", fontSize = 11.sp)
-                                    }
-                                }
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Copy All Info", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            }
 
-                                if (cardholderName.isNotBlank()) {
-                                    OutlinedButton(
-                                        onClick = { copyToClipboard("Cardholder Name", cardholderName) },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                                    ) {
-                                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Copy Name", fontSize = 11.sp)
-                                    }
+                            if (rawCardNumber.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = { copyToClipboard("Card Number", rawCardNumber) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                                ) {
+                                    Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Copy Number", fontSize = 12.sp, maxLines = 1)
                                 }
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
+
+                            if (cardholderName.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = { copyToClipboard("Cardholder Name", cardholderName) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                                ) {
+                                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Copy Name", fontSize = 12.sp, maxLines = 1)
+                                }
+                            }
+
+                            if (rawExpiryDigits.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val exp = if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}" else rawExpiryDigits
+                                        copyToClipboard("Expiry", exp)
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                                ) {
+                                    Text("Copy Expiry", fontSize = 12.sp, maxLines = 1)
+                                }
+                            }
+
+                            if (cvv.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = { copyToClipboard("CVV Code", cvv) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                                ) {
+                                    Text("Copy CVV", fontSize = 12.sp, maxLines = 1)
+                                }
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         // Prompt to use Camera if PAN is restricted
                         if (rawCardNumber.isBlank() || readResult?.hasFullCardNumber == false) {
@@ -378,8 +478,8 @@ fun NfcScanScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth().height(46.dp),
                                 shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                                border = BorderStroke(1.dp, Color(0xFF38BDF8))
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
                             ) {
                                 Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -390,12 +490,14 @@ fun NfcScanScreen(
 
                         // Editable verification form
                         val fieldColors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF38BDF8),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedLabelColor = Color(0xFF38BDF8),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
                         )
 
                         OutlinedTextField(
@@ -433,7 +535,7 @@ fun NfcScanScreen(
                                         Icon(
                                             imageVector = Icons.Default.ContentCopy,
                                             contentDescription = "Copy Number",
-                                            tint = Color.White.copy(alpha = 0.7f),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -457,7 +559,7 @@ fun NfcScanScreen(
                                         Icon(
                                             imageVector = Icons.Default.ContentCopy,
                                             contentDescription = "Copy Name",
-                                            tint = Color.White.copy(alpha = 0.7f),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -475,10 +577,29 @@ fun NfcScanScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             OutlinedTextField(
-                                value = expiryDate,
-                                onValueChange = { expiryDate = it },
+                                value = rawExpiryDigits,
+                                onValueChange = { input ->
+                                    rawExpiryDigits = input.filter { it.isDigit() }.take(4)
+                                },
                                 label = { Text("Expiry (MM/YY)") },
                                 placeholder = { Text("12/28") },
+                                visualTransformation = NfcExpiryDateVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                trailingIcon = {
+                                    if (rawExpiryDigits.isNotBlank()) {
+                                        IconButton(onClick = {
+                                            val exp = if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}" else rawExpiryDigits
+                                            copyToClipboard("Expiry", exp)
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.ContentCopy,
+                                                contentDescription = "Copy Expiry",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                },
                                 modifier = Modifier.weight(1.2f),
                                 colors = fieldColors,
                                 singleLine = true
@@ -490,6 +611,7 @@ fun NfcScanScreen(
                                 onValueChange = { cvv = it.filter { c -> c.isDigit() }.take(4) },
                                 label = { Text("CVV (Optional)") },
                                 placeholder = { Text("•••") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(0.8f),
                                 colors = fieldColors,
                                 singleLine = true
@@ -511,14 +633,19 @@ fun NfcScanScreen(
 
                         ElevatedButton(
                             onClick = {
+                                val finalExpiry = if (rawExpiryDigits.length >= 4) {
+                                    "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
+                                } else rawExpiryDigits
+
                                 val finalCard = detectedCard!!.copy(
                                     title = cardTitle.ifBlank { "${bankOrIssuer.ifBlank { cardType }} Card" },
                                     cardNumber = rawCardNumber,
                                     cardholderName = cardholderName.uppercase(),
-                                    expiryDate = expiryDate,
+                                    expiryDate = finalExpiry,
                                     cvv = cvv,
                                     bankOrIssuer = bankOrIssuer.ifBlank { cardType },
-                                    cardType = cardType
+                                    cardType = cardType,
+                                    cardArtUrl = cardArtUrl
                                 )
                                 haptics?.success()
                                 onCardSaved(finalCard)
@@ -528,8 +655,8 @@ fun NfcScanScreen(
                                 .height(50.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.elevatedButtonColors(
-                                containerColor = Color(0xFF0284C7),
-                                contentColor = Color.White
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             )
                         ) {
                             Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))

@@ -13,6 +13,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +47,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
@@ -52,6 +61,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -89,11 +99,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ai.GeminiCardScannerService
 import com.example.ai.ScanResult
+import com.example.data.CardArtDesign
+import com.example.data.CardArtOnlineService
 import com.example.data.CardEntity
 import com.example.security.HapticsHelper
 import com.example.ui.components.CameraXCardScannerView
 import com.example.ui.components.CreditCardItem
 import com.example.ui.theme.BitmapPaletteExtractor
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 
 /**
@@ -126,6 +140,40 @@ class PaymentCardVisualTransformation : VisualTransformation {
     }
 }
 
+/**
+ * Visual transformation that displays 4-digit expiry as MM/YY without mutating the String state,
+ * preventing cursor jumps and digit skips.
+ */
+class ExpiryDateVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val trimmed = if (text.text.length >= 4) text.text.substring(0, 4) else text.text
+        val out = StringBuilder()
+        for (i in trimmed.indices) {
+            out.append(trimmed[i])
+            if (i == 1 && trimmed.length > 2) {
+                out.append('/')
+            }
+        }
+        val transformed = out.toString()
+        val offsetTranslator = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 1) return offset
+                if (offset <= 4) {
+                    return if (trimmed.length > 2) offset + 1 else offset
+                }
+                return transformed.length
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (offset <= 2) return offset
+                if (offset <= transformed.length) return offset - 1
+                return trimmed.length
+            }
+        }
+        return TransformedText(AnnotatedString(transformed), offsetTranslator)
+    }
+}
+
 enum class CardCategoryType(val id: String, val label: String, val category: String) {
     PAYMENT("VISA", "Payment", "PAYMENT"),
     ID_CARD("ID_CARD", "ID Card", "IDENTITY"),
@@ -140,6 +188,8 @@ fun ScanCardScreen(
     onNavigateBack: () -> Unit,
     onCardSaved: (CardEntity) -> Unit,
     initialManualMode: Boolean = false,
+    isOnlineCardArtEnabled: Boolean = false,
+    onEnableOnlineCardArt: () -> Unit = {},
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
@@ -158,17 +208,73 @@ fun ScanCardScreen(
     var title by remember { mutableStateOf("") }
     var cardholderName by remember { mutableStateOf("") }
     var rawCardNumber by remember { mutableStateOf("") }
-    var expiryDate by remember { mutableStateOf("") }
+    var rawExpiryDigits by remember { mutableStateOf("") }
     var cvv by remember { mutableStateOf("") }
     var bankOrIssuer by remember { mutableStateOf("") }
     var selectedHex by remember { mutableStateOf("#1E293B") }
     var secondaryHex by remember { mutableStateOf("#0F172A") }
+    var cardArtUrl by remember { mutableStateOf("") }
+
+    // Online Card Art Gallery & Search State
+    var showArtPickerSection by remember { mutableStateOf(false) }
+    var artSearchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<CardArtDesign>>(emptyList()) }
+    var isSearchingArt by remember { mutableStateOf(false) }
+    var showSettingDisabledPrompt by remember { mutableStateOf(false) }
 
     fun copyToClipboard(label: String, text: String) {
         if (text.isNotBlank()) {
             clipboardManager.setText(AnnotatedString(text))
             haptics?.success()
             copiedLabel = label
+        }
+    }
+
+    fun copyAllCardDetails() {
+        val exp = if (selectedCategoryType == CardCategoryType.PAYMENT && rawExpiryDigits.length >= 4) {
+            "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
+        } else rawExpiryDigits
+
+        val details = buildString {
+            if (title.isNotBlank()) appendLine("Card Label: $title")
+            if (rawCardNumber.isNotBlank()) appendLine("Card Number: $rawCardNumber")
+            if (cardholderName.isNotBlank()) appendLine("Cardholder: $cardholderName")
+            if (exp.isNotBlank()) appendLine("Valid Till / Expiry: $exp")
+            if (cvv.isNotBlank()) appendLine("CVV: $cvv")
+            if (bankOrIssuer.isNotBlank()) appendLine("Bank / Issuer: $bankOrIssuer")
+            appendLine("Category: ${selectedCategoryType.label}")
+        }.trim()
+        copyToClipboard("All Details", details)
+    }
+
+    // Determine card type string based on number or selected category
+    val currentCardType: String = when (selectedCategoryType) {
+        CardCategoryType.PAYMENT -> {
+            val clean = rawCardNumber.filter { it.isDigit() }
+            when {
+                clean.startsWith("4") -> "VISA"
+                clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") ||
+                        (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
+                clean.startsWith("34") || clean.startsWith("37") -> "AMEX"
+                clean.startsWith("6011") || clean.startsWith("65") -> "DISCOVER"
+                else -> "VISA"
+            }
+        }
+        CardCategoryType.ID_CARD -> "ID_CARD"
+        CardCategoryType.RC_CARD -> "RC_CARD"
+        CardCategoryType.VOUCHER -> "VOUCHER"
+        CardCategoryType.MISC -> "MISC"
+    }
+
+    fun searchArt() {
+        isSearchingArt = true
+        coroutineScope.launch {
+            searchResults = CardArtOnlineService.searchCardArt(
+                query = artSearchQuery.ifBlank { bankOrIssuer.ifBlank { title } },
+                issuer = bankOrIssuer,
+                cardType = currentCardType
+            )
+            isSearchingArt = false
         }
     }
 
@@ -193,7 +299,11 @@ fun ScanCardScreen(
                     title = result.card.title
                     cardholderName = result.card.cardholderName
                     rawCardNumber = result.card.cardNumber.replace("\\s+".toRegex(), "")
-                    expiryDate = result.card.expiryDate
+                    rawExpiryDigits = if (result.card.cardType in listOf("ID_CARD", "RC_CARD", "VOUCHER", "MISC")) {
+                        result.card.expiryDate
+                    } else {
+                        result.card.expiryDate.filter { it.isDigit() }
+                    }
                     cvv = result.card.cvv
                     bankOrIssuer = result.card.bankOrIssuer
                     selectedCategoryType = when (result.card.cardType) {
@@ -208,6 +318,16 @@ fun ScanCardScreen(
                     }
                     if (result.card.gradientEndHex.isNotBlank() && result.card.gradientEndHex != "#0F172A") {
                         secondaryHex = result.card.gradientEndHex
+                    }
+
+                    // If authentic online card artwork flag is enabled, auto-suggest authentic card design
+                    if (isOnlineCardArtEnabled) {
+                        val suggested = CardArtOnlineService.suggestArtForCard(result.card)
+                        if (suggested != null) {
+                            cardArtUrl = suggested.imageUrl
+                            selectedHex = suggested.accentColorHex
+                            secondaryHex = suggested.gradientEndHex
+                        }
                     }
                 }
                 is ScanResult.Error -> {
@@ -243,25 +363,6 @@ fun ScanCardScreen(
         }
     }
 
-    // Determine card type string based on number or selected category
-    val currentCardType: String = when (selectedCategoryType) {
-        CardCategoryType.PAYMENT -> {
-            val clean = rawCardNumber.filter { it.isDigit() }
-            when {
-                clean.startsWith("4") -> "VISA"
-                clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") ||
-                        (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
-                clean.startsWith("34") || clean.startsWith("37") -> "AMEX"
-                clean.startsWith("6011") || clean.startsWith("65") -> "DISCOVER"
-                else -> "VISA"
-            }
-        }
-        CardCategoryType.ID_CARD -> "ID_CARD"
-        CardCategoryType.RC_CARD -> "RC_CARD"
-        CardCategoryType.VOUCHER -> "VOUCHER"
-        CardCategoryType.MISC -> "MISC"
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -278,13 +379,13 @@ fun ScanCardScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF13100E),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
-        containerColor = Color(0xFF13100E)
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = modifier
@@ -299,12 +400,12 @@ fun ScanCardScreen(
             // Mode Selector Tabs: Camera Scan vs Manual Entry
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = Color(0xFF221C18),
-                contentColor = Color(0xFFE5A93C),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.primary,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = Color(0xFFE5A93C)
+                        color = MaterialTheme.colorScheme.primary
                     )
                 },
                 modifier = Modifier
@@ -339,7 +440,7 @@ fun ScanCardScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(360.dp)
+                            .height(420.dp)
                             .clip(RoundedCornerShape(20.dp))
                             .background(Color.Black)
                             .border(1.dp, Color(0xFFE5A93C).copy(alpha = 0.4f), RoundedCornerShape(20.dp))
@@ -449,7 +550,7 @@ fun ScanCardScreen(
                 // Card Category Chips (Payment, ID Card, RC Vehicle, Voucher, Misc)
                 Text(
                     text = "Card Type",
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.Start)
@@ -457,9 +558,13 @@ fun ScanCardScreen(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                // Horizontally scrollable chips so buttons NEVER squash vertically or wrap letters
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CardCategoryType.values().forEach { cat ->
                         val isSelected = selectedCategoryType == cat
@@ -469,17 +574,26 @@ fun ScanCardScreen(
                                 haptics?.cardSelect()
                                 selectedCategoryType = cat
                             },
-                            label = { Text(cat.label, fontSize = 11.sp) },
+                            label = {
+                                Text(
+                                    text = cat.label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            },
+                            shape = RoundedCornerShape(20.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFE5A93C),
-                                selectedLabelColor = Color(0xFF1E1000),
-                                containerColor = Color(0xFF221C18),
-                                labelColor = Color.White
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             border = FilterChipDefaults.filterChipBorder(
                                 enabled = true,
                                 selected = isSelected,
-                                borderColor = if (isSelected) Color(0xFFE5A93C) else Color.White.copy(alpha = 0.15f)
+                                borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                             )
                         )
                     }
@@ -488,6 +602,12 @@ fun ScanCardScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Reconstructed live preview card (Flat, zero shadow)
+                val previewExpiry = if (selectedCategoryType == CardCategoryType.PAYMENT) {
+                    if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
+                    else if (rawExpiryDigits.length >= 2) "${rawExpiryDigits.take(2)}/"
+                    else rawExpiryDigits.ifBlank { "12/28" }
+                } else rawExpiryDigits
+
                 val previewCard = CardEntity(
                     title = title.ifBlank {
                         when (selectedCategoryType) {
@@ -500,13 +620,14 @@ fun ScanCardScreen(
                     },
                     cardholderName = cardholderName.ifBlank { "HOLDER NAME" },
                     cardNumber = rawCardNumber.ifBlank { "•••• •••• •••• ••••" },
-                    expiryDate = expiryDate.ifBlank { if (selectedCategoryType == CardCategoryType.PAYMENT) "12/28" else "" },
+                    expiryDate = previewExpiry,
                     cvv = cvv,
                     cardType = currentCardType,
                     category = selectedCategoryType.category,
                     bankOrIssuer = bankOrIssuer,
                     themeColorHex = selectedHex,
-                    gradientEndHex = secondaryHex
+                    gradientEndHex = secondaryHex,
+                    cardArtUrl = cardArtUrl
                 )
 
                 CreditCardItem(
@@ -535,49 +656,306 @@ fun ScanCardScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // Quick Copy Actions for Card Number & Cardholder Name
-                if (rawCardNumber.isNotBlank() || cardholderName.isNotBlank()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Quick Copy Actions (Scrollable: Copy All Info, Copy Number, Copy Name, Copy Expiry, Copy CVV)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { copyAllCardDetails() },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
                     ) {
-                        if (rawCardNumber.isNotBlank()) {
-                            OutlinedButton(
-                                onClick = { copyToClipboard("Card Number", rawCardNumber) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                            ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Copy Number", fontSize = 11.sp)
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Copy All Info", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+
+                    if (rawCardNumber.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { copyToClipboard("Card Number", rawCardNumber) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                        ) {
+                            Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy Number", fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+
+                    if (cardholderName.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { copyToClipboard("Cardholder Name", cardholderName) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                        ) {
+                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy Name", fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+
+                    if (rawExpiryDigits.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                val exp = if (selectedCategoryType == CardCategoryType.PAYMENT && rawExpiryDigits.length >= 4) {
+                                    "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
+                                } else rawExpiryDigits
+                                copyToClipboard("Expiry", exp)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                        ) {
+                            Text("Copy Expiry", fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+
+                    if (cvv.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { copyToClipboard("CVV Code", cvv) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+                        ) {
+                            Text("Copy CVV", fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // ================= AUTHENTIC WEB CARD ARTWORK SECTION =================
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Authentic Web Card Art",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    if (cardArtUrl.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                haptics?.cardSelect()
+                                cardArtUrl = ""
+                            }
+                        ) {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Reset Art", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        haptics?.cardSelect()
+                        if (!isOnlineCardArtEnabled) {
+                            showSettingDisabledPrompt = true
+                        } else {
+                            showArtPickerSection = !showArtPickerSection
+                            if (showArtPickerSection && searchResults.isEmpty()) {
+                                searchArt()
                             }
                         }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                ) {
+                    Icon(
+                        imageVector = if (showArtPickerSection) Icons.Default.Close else Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (showArtPickerSection) "Hide Artwork Gallery" else "Fetch Actual Card Art from Web",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
 
-                        if (cardholderName.isNotBlank()) {
-                            OutlinedButton(
-                                onClick = { copyToClipboard("Cardholder Name", cardholderName) },
+                AnimatedVisibility(visible = showArtPickerSection) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = artSearchQuery,
+                                onValueChange = { artSearchQuery = it },
+                                placeholder = { Text("Search issuer/card (e.g. Chase, Amex, Apple)", fontSize = 12.sp) },
+                                singleLine = true,
                                 modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                trailingIcon = {
+                                    IconButton(onClick = { searchArt() }) {
+                                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (isSearchingArt) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(100.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Copy Name", fontSize = 11.sp)
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                            }
+                        } else if (searchResults.isEmpty()) {
+                            Text(
+                                text = "No card art designs found. Try searching for 'Chase', 'Amex', 'Citi', 'Apple', or 'Capital One'.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        } else {
+                            Text(
+                                text = "Tap a design to apply authentic card look:",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                items(searchResults) { design ->
+                                    val isSelected = cardArtUrl == design.imageUrl
+                                    Box(
+                                        modifier = Modifier
+                                            .width(135.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(
+                                                width = if (isSelected) 2.5.dp else 1.dp,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .clickable {
+                                                haptics?.cardSelect()
+                                                cardArtUrl = design.imageUrl
+                                                selectedHex = design.accentColorHex
+                                                secondaryHex = design.gradientEndHex
+                                            }
+                                    ) {
+                                        Column {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(85.dp)
+                                            ) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(LocalContext.current)
+                                                        .data(design.imageUrl)
+                                                        .crossfade(true)
+                                                        .build(),
+                                                    contentDescription = design.name,
+                                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                                    modifier = Modifier.fillMaxSize()
+                                                )
+                                                if (isSelected) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .padding(6.dp)
+                                                            .size(20.dp)
+                                                            .clip(CircleShape)
+                                                            .background(MaterialTheme.colorScheme.primary)
+                                                            .align(Alignment.TopEnd),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
+                                                    }
+                                                }
+                                            }
+                                            Column(modifier = Modifier.padding(6.dp)) {
+                                                Text(
+                                                    text = design.name,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = design.issuer,
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Text Fields Form
                 val fieldColors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFE5A93C),
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedLabelColor = Color(0xFFE5A93C),
-                    unfocusedLabelColor = Color.White.copy(alpha = 0.6f)
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
                 )
 
                 // 1. Title / Label
@@ -641,7 +1019,7 @@ fun ScanCardScreen(
                                 Icon(
                                     imageVector = Icons.Default.ContentCopy,
                                     contentDescription = "Copy Number",
-                                    tint = Color.White.copy(alpha = 0.6f),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -674,7 +1052,7 @@ fun ScanCardScreen(
                                 Icon(
                                     imageVector = Icons.Default.ContentCopy,
                                     contentDescription = "Copy Name",
-                                    tint = Color.White.copy(alpha = 0.6f),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -687,21 +1065,18 @@ fun ScanCardScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 4. Expiry Date & CVV (CVV only for payment/misc)
+                // 4. Expiry Date & CVV (Clean digits input with ExpiryDateVisualTransformation to prevent cursor jumping or skipping)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
-                        value = expiryDate,
+                        value = rawExpiryDigits,
                         onValueChange = { input ->
                             if (isPayment) {
-                                val digits = input.filter { it.isDigit() }.take(4)
-                                expiryDate = if (digits.length >= 3) {
-                                    "${digits.substring(0, 2)}/${digits.substring(2)}"
-                                } else digits
+                                rawExpiryDigits = input.filter { it.isDigit() }.take(4)
                             } else {
-                                expiryDate = input.take(10)
+                                rawExpiryDigits = input.take(10)
                             }
                         },
                         label = {
@@ -710,6 +1085,27 @@ fun ScanCardScreen(
                             )
                         },
                         placeholder = { Text(if (isPayment) "12/28" else "MM/YY or YYYY") },
+                        visualTransformation = if (isPayment) ExpiryDateVisualTransformation() else VisualTransformation.None,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = if (isPayment) KeyboardType.Number else KeyboardType.Ascii
+                        ),
+                        trailingIcon = {
+                            if (rawExpiryDigits.isNotBlank()) {
+                                IconButton(onClick = {
+                                    val exp = if (isPayment && rawExpiryDigits.length >= 4) {
+                                        "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
+                                    } else rawExpiryDigits
+                                    copyToClipboard("Expiry", exp)
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy Expiry",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        },
                         modifier = Modifier.weight(if (isPayment) 1.2f else 1f),
                         colors = fieldColors,
                         singleLine = true
@@ -721,6 +1117,19 @@ fun ScanCardScreen(
                             onValueChange = { cvv = it.filter { c -> c.isDigit() }.take(4) },
                             label = { Text("CVV") },
                             placeholder = { Text("•••") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            trailingIcon = {
+                                if (cvv.isNotBlank()) {
+                                    IconButton(onClick = { copyToClipboard("CVV", cvv) }) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentCopy,
+                                            contentDescription = "Copy CVV",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(0.8f),
                             colors = fieldColors,
                             singleLine = true
@@ -751,32 +1160,34 @@ fun ScanCardScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Card Color Theme Picker
+                // Card Color Theme Picker (Scrollable)
                 Text(
                     text = "Card Color",
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.Start)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     val palette = listOf(
-                        "#1E293B", "#0C2340", "#854D0E", "#134E4A", "#701A75", "#161618"
+                        "#1E293B", "#0C2340", "#854D0E", "#134E4A", "#701A75", "#161618", "#1E3A8A", "#065F46"
                     )
                     for (hex in palette) {
                         val c = Color(android.graphics.Color.parseColor(hex))
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(c)
                                 .border(
                                     width = if (selectedHex == hex) 3.dp else 1.dp,
-                                    color = if (selectedHex == hex) Color.White else Color.Transparent,
+                                    color = if (selectedHex == hex) MaterialTheme.colorScheme.primary else Color.Transparent,
                                     shape = CircleShape
                                 )
                                 .clickable { selectedHex = hex }
@@ -789,6 +1200,10 @@ fun ScanCardScreen(
                 // Save Card Button
                 ElevatedButton(
                     onClick = {
+                        val finalExpiry = if (selectedCategoryType == CardCategoryType.PAYMENT && rawExpiryDigits.length >= 4) {
+                            "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
+                        } else rawExpiryDigits
+
                         val newCard = CardEntity(
                             title = title.ifBlank {
                                 when (selectedCategoryType) {
@@ -801,13 +1216,14 @@ fun ScanCardScreen(
                             },
                             cardholderName = cardholderName.uppercase(),
                             cardNumber = rawCardNumber,
-                            expiryDate = expiryDate,
+                            expiryDate = finalExpiry,
                             cvv = cvv,
                             cardType = currentCardType,
                             category = selectedCategoryType.category,
                             bankOrIssuer = bankOrIssuer,
                             themeColorHex = selectedHex,
-                            gradientEndHex = selectedHex,
+                            gradientEndHex = secondaryHex,
+                            cardArtUrl = cardArtUrl,
                             notes = if (capturedBitmap != null) "Scanned with Gemini 3.1 Pro OCR" else "Added manually",
                             scannedVia = if (capturedBitmap != null) "CAMERA_AI" else "MANUAL",
                             createdAt = System.currentTimeMillis()
@@ -820,8 +1236,8 @@ fun ScanCardScreen(
                         .height(50.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
-                        containerColor = Color(0xFFE5A93C),
-                        contentColor = Color(0xFF231404)
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -837,5 +1253,52 @@ fun ScanCardScreen(
                 Spacer(modifier = Modifier.height(30.dp))
             }
         }
+    }
+
+    // Setting disabled dialog prompt
+    if (showSettingDisabledPrompt) {
+        AlertDialog(
+            onDismissRequest = { showSettingDisabledPrompt = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Language,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text("Enable Online Card Art?", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Fetching real card artwork from the internet is currently turned off in Settings. Would you like to enable it now?",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                ElevatedButton(
+                    onClick = {
+                        onEnableOnlineCardArt()
+                        showSettingDisabledPrompt = false
+                        showArtPickerSection = true
+                        searchArt()
+                        haptics?.success()
+                    },
+                    colors = ButtonDefaults.elevatedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text("Turn On & Fetch", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettingDisabledPrompt = false }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     }
 }

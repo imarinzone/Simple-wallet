@@ -21,16 +21,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -62,6 +65,7 @@ fun CardDetailBottomSheet(
     onDismiss: () -> Unit,
     onDeleteCard: (CardEntity) -> Unit,
     onToggleFavorite: (CardEntity) -> Unit,
+    onEditCard: (CardEntity) -> Unit = {},
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
@@ -79,10 +83,24 @@ fun CardDetailBottomSheet(
         }
     }
 
+    fun copyAllCardDetails() {
+        val details = buildString {
+            appendLine("Title: ${card.title}")
+            if (card.cardNumber.isNotBlank()) appendLine("Card Number: ${card.cardNumber}")
+            if (card.cardholderName.isNotBlank()) appendLine("Cardholder: ${card.cardholderName}")
+            if (card.expiryDate.isNotBlank()) appendLine("Expiry: ${card.expiryDate}")
+            if (card.cvv.isNotBlank()) appendLine("CVV: ${card.cvv}")
+            if (card.bankOrIssuer.isNotBlank()) appendLine("Issuer / Bank: ${card.bankOrIssuer}")
+            appendLine("Card Type: ${card.cardType}")
+            if (card.nfcTagUid.isNotBlank()) appendLine("NFC Tag UID: ${card.nfcTagUid}")
+        }.trim()
+        copyToClipboard("All Details", details)
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF171310),
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 8.dp,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
@@ -103,7 +121,7 @@ fun CardDetailBottomSheet(
             ) {
                 Text(
                     text = card.title.ifBlank { "Card Details" },
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f, fill = false)
@@ -119,12 +137,12 @@ fun CardDetailBottomSheet(
                         Icon(
                             imageVector = if (card.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = "Favorite",
-                            tint = if (card.isFavorite) Color(0xFFEF4444) else Color.White.copy(alpha = 0.6f)
+                            tint = if (card.isFavorite) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -158,6 +176,23 @@ fun CardDetailBottomSheet(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
+            // Prominent "Copy All Details" Action Button
+            OutlinedButton(
+                onClick = { copyAllCardDetails() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+            ) {
+                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Copy All Card Text & Details", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Quick Data Actions: Separate Copy Number & Copy Name
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -169,7 +204,8 @@ fun CardDetailBottomSheet(
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                 ) {
                     Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -183,7 +219,8 @@ fun CardDetailBottomSheet(
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                     ) {
                         Icon(imageVector = Icons.Default.Person, contentDescription = null, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -200,7 +237,8 @@ fun CardDetailBottomSheet(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                 ) {
                     Icon(imageVector = Icons.Default.Security, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -215,7 +253,7 @@ fun CardDetailBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF221C18))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -303,6 +341,29 @@ fun CardDetailBottomSheet(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
+
+            // Edit Card & Artwork Action
+            Button(
+                onClick = {
+                    haptics?.cardSelect()
+                    onDismiss()
+                    onEditCard(card)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Edit Card & Online Art", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Delete Card Action
             OutlinedButton(

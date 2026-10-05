@@ -20,6 +20,7 @@ data class CardEntity(
     val notes: String = "",
     val nfcTagUid: String = "",
     val scannedVia: String = "CAMERA_AI", // CAMERA_AI, NFC, MANUAL
+    val cardArtUrl: String = "", // Online artwork image URL for authentic card face
     val createdAt: Long = System.currentTimeMillis(),
     val isFavorite: Boolean = false,
     val slotIndex: Int = 0

@@ -9,7 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,9 +29,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,6 +59,7 @@ import com.example.ui.WalletViewModel
 import com.example.ui.components.BiometricLockOverlay
 import com.example.ui.screens.AddCardChooserBottomSheet
 import com.example.ui.screens.CardDetailBottomSheet
+import com.example.ui.screens.EditCardDialog
 import com.example.ui.screens.NfcCardDetectedDialog
 import com.example.ui.screens.NfcScanScreen
 import com.example.ui.screens.SamsungWalletHomeScreen
@@ -158,6 +165,9 @@ fun MainAppContent(
     val hapticSensitivity by viewModel.hapticSensitivity.collectAsState()
     val scannedPhysicalCard by viewModel.scannedPhysicalCard.collectAsState()
     val showLockSuggestionDialog by viewModel.showLockSuggestionDialog.collectAsState()
+    val isOnlineCardArtEnabled by viewModel.isOnlineCardArtEnabled.collectAsState()
+    val selectedCardForEdit by viewModel.selectedCardForEdit.collectAsState()
+    val selectedCardForDetail by viewModel.selectedCardForDetail.collectAsState()
 
     var showAddCardChooser by remember { mutableStateOf(false) }
     var startInManualMode by remember { mutableStateOf(false) }
@@ -173,7 +183,7 @@ fun MainAppContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F0E0D))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         if (isLocked && isBiometricEnabled) {
             // Absolute Security Shield: Cards are completely hidden behind biometric lock
@@ -198,6 +208,9 @@ fun MainAppContent(
                             biometricErrorMessage = err
                         }
                     )
+                },
+                onSetMasterPin = { newPin ->
+                    viewModel.setMasterPin(newPin)
                 },
                 biometricError = biometricErrorMessage,
                 haptics = haptics
@@ -227,6 +240,9 @@ fun MainAppContent(
                         onToggleFavorite = {
                             viewModel.toggleFavorite(it)
                         },
+                        onEditCard = {
+                            viewModel.openCardEdit(it)
+                        },
                         leatherFinish = leatherFinish,
                         haptics = haptics
                     )
@@ -237,6 +253,8 @@ fun MainAppContent(
                         onNavigateBack = { viewModel.navigateTo(AppScreen.WALLET_HOME) },
                         onCardSaved = { viewModel.saveCard(it) },
                         initialManualMode = startInManualMode,
+                        isOnlineCardArtEnabled = isOnlineCardArtEnabled,
+                        onEnableOnlineCardArt = { viewModel.toggleOnlineCardArt(true) },
                         haptics = haptics
                     )
                 }
@@ -246,6 +264,8 @@ fun MainAppContent(
                         onNavigateBack = { viewModel.navigateTo(AppScreen.WALLET_HOME) },
                         onCardSaved = { viewModel.saveCard(it) },
                         onNavigateToCameraScan = { viewModel.navigateTo(AppScreen.SCAN_CAMERA) },
+                        isOnlineCardArtEnabled = isOnlineCardArtEnabled,
+                        onEnableOnlineCardArt = { viewModel.toggleOnlineCardArt(true) },
                         haptics = haptics
                     )
                 }
@@ -273,6 +293,8 @@ fun MainAppContent(
                         onToggleHaptics = { viewModel.toggleHaptics(it) },
                         hapticSensitivity = hapticSensitivity,
                         onHapticSensitivityChange = { viewModel.setHapticSensitivity(it) },
+                        isOnlineCardArtEnabled = isOnlineCardArtEnabled,
+                        onToggleOnlineCardArt = { viewModel.toggleOnlineCardArt(it) },
                         onNavigateBack = { viewModel.navigateTo(AppScreen.WALLET_HOME) },
                         haptics = haptics
                     )
@@ -320,62 +342,149 @@ fun MainAppContent(
 
             // First-load opt-in suggestion dialog: suggest setting up lock
             if (showLockSuggestionDialog) {
-                AlertDialog(
-                    onDismissRequest = { viewModel.dismissLockSuggestion() },
-                    icon = {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFE5A93C).copy(alpha = 0.18f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Fingerprint,
-                                contentDescription = null,
-                                tint = Color(0xFFE5A93C),
-                                modifier = Modifier.size(28.dp)
+                var showSetupPinPrompt by remember { mutableStateOf(false) }
+                var initialPinInput by remember { mutableStateOf("") }
+
+                if (!showSetupPinPrompt) {
+                    AlertDialog(
+                        onDismissRequest = { viewModel.dismissLockSuggestion() },
+                        icon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        },
+                        title = {
+                            Text(
+                                text = "Enable App Lock?",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
                             )
-                        }
-                    },
-                    title = {
-                        Text(
-                            text = "Enable App Lock?",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "Protect your cards with fingerprint or PIN.",
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 14.sp
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                viewModel.enableLockFromSuggestion()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFE5A93C),
-                                contentColor = Color(0xFF1E1002)
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Enable", fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = { viewModel.dismissLockSuggestion() }
-                        ) {
-                            Text("Skip", color = Color.White.copy(alpha = 0.65f))
-                        }
-                    },
-                    containerColor = Color(0xFF1E1A17),
-                    shape = RoundedCornerShape(22.dp)
+                        },
+                        text = {
+                            Text(
+                                text = "Protect your cards with fingerprint or a personal master PIN.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showSetupPinPrompt = true
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Set PIN & Enable", fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { viewModel.dismissLockSuggestion() }
+                            ) {
+                                Text("Skip", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(22.dp)
+                    )
+                } else {
+                    AlertDialog(
+                        onDismissRequest = { viewModel.dismissLockSuggestion() },
+                        title = {
+                            Text(
+                                text = "Set 4-Digit Master PIN",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        },
+                        text = {
+                            Column {
+                                Text(
+                                    text = "Create a 4-digit PIN to use whenever fingerprint is unavailable.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 13.sp
+                                )
+                                Spacer(modifier = Modifier.height(14.dp))
+                                OutlinedTextField(
+                                    value = initialPinInput,
+                                    onValueChange = { input ->
+                                        initialPinInput = input.filter { it.isDigit() }.take(4)
+                                    },
+                                    placeholder = { Text("e.g. 2580") },
+                                    label = { Text("4-Digit PIN") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val finalPin = if (initialPinInput.length == 4) initialPinInput else "1234"
+                                    viewModel.setMasterPin(finalPin)
+                                    viewModel.enableLockFromSuggestion()
+                                },
+                                enabled = initialPinInput.length == 4,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Save & Enable", fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { viewModel.dismissLockSuggestion() }
+                            ) {
+                                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(22.dp)
+                    )
+                }
+            }
+
+            // Edit Card Dialog
+            if (selectedCardForEdit != null) {
+                EditCardDialog(
+                    card = selectedCardForEdit!!,
+                    isOnlineCardArtEnabled = isOnlineCardArtEnabled,
+                    onDismiss = { viewModel.closeCardEdit() },
+                    onSaveCard = { viewModel.updateCard(it) },
+                    onEnableOnlineCardArt = { viewModel.toggleOnlineCardArt(true) },
+                    haptics = haptics
+                )
+            }
+
+            // Card Detail Bottom Sheet
+            if (selectedCardForDetail != null) {
+                CardDetailBottomSheet(
+                    card = selectedCardForDetail!!,
+                    onDismiss = { viewModel.closeCardDetail() },
+                    onDeleteCard = { viewModel.deleteCard(it) },
+                    onToggleFavorite = { viewModel.toggleFavorite(it) },
+                    onEditCard = { viewModel.openCardEdit(it) },
+                    haptics = haptics
                 )
             }
         }

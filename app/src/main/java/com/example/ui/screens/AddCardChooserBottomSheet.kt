@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -53,7 +54,7 @@ fun AddCardChooserBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFF171310),
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 10.dp,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
@@ -72,7 +73,7 @@ fun AddCardChooserBottomSheet(
             ) {
                 Text(
                     text = "Add Card",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -81,7 +82,7 @@ fun AddCardChooserBottomSheet(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = Color.White.copy(alpha = 0.7f)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -92,7 +93,7 @@ fun AddCardChooserBottomSheet(
             ScanMethodItem(
                 title = "Camera Scan",
                 icon = Icons.Default.CameraAlt,
-                accentColor = Color(0xFFE5A93C),
+                accentColor = MaterialTheme.colorScheme.primary,
                 onClick = {
                     haptics?.cardSelect()
                     onDismiss()
@@ -120,7 +121,7 @@ fun AddCardChooserBottomSheet(
             ScanMethodItem(
                 title = "Manual Entry",
                 icon = Icons.Default.Edit,
-                accentColor = Color(0xFF94A3B8),
+                accentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 onClick = {
                     haptics?.cardSelect()
                     onDismiss()
@@ -142,8 +143,8 @@ private fun ScanMethodItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF221C18))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
@@ -170,7 +171,7 @@ private fun ScanMethodItem(
 
             Text(
                 text = title,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
@@ -179,7 +180,7 @@ private fun ScanMethodItem(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.4f),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
         }

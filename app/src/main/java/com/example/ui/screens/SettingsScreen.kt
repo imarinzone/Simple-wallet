@@ -73,6 +73,8 @@ fun SettingsScreen(
     onToggleHaptics: (Boolean) -> Unit,
     hapticSensitivity: HapticSensitivity = HapticSensitivity.MEDIUM,
     onHapticSensitivityChange: (HapticSensitivity) -> Unit = {},
+    isOnlineCardArtEnabled: Boolean = false,
+    onToggleOnlineCardArt: (Boolean) -> Unit = {},
     onNavigateBack: () -> Unit,
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
@@ -357,6 +359,52 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // 4. CARD ARTWORK & WEB DESIGNS (DEFAULT OFF)
+            Text(
+                text = "Card Appearance & Web Art",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 0.5.sp
+            )
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(
+                                text = "Fetch Card Art from Web",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Search and download official card designs to display the real look & feel of your cards.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = isOnlineCardArtEnabled,
+                            onCheckedChange = {
+                                haptics?.cardSelect()
+                                onToggleOnlineCardArt(it)
+                            }
+                        )
                     }
                 }
             }
