@@ -143,8 +143,8 @@ class TeardropCameraNotchShape : Shape {
         val w = size.width
         val h = size.height
         val cx = w / 2f
-        val radius = with(density) { 16.dp.toPx() }
-        val cy = with(density) { 18.dp.toPx() }
+        val radius = with(density) { 19.dp.toPx() }
+        val cy = with(density) { 21.dp.toPx() }
 
         val path = Path().apply {
             moveTo(0f, h)
@@ -210,6 +210,9 @@ fun WalletHomeScreen(
     var isNfcPayingAnimation by remember { mutableStateOf(false) }
     var isCardSelected by remember { mutableStateOf(false) }
     var isVerticalStackMode by remember { mutableStateOf(false) }
+
+    val addCardDragOffset = remember { Animatable(0f) }
+    var lastAddCardHapticMilestone by remember { mutableFloatStateOf(0f) }
 
     // Hardware back navigation handler: collapses stack or deselects card
     BackHandler(enabled = isVerticalStackMode || isCardSelected) {
@@ -524,20 +527,13 @@ fun WalletHomeScreen(
                                             .offset { IntOffset(0, cardDragOffset.value.roundToInt()) }
                                     ) { page ->
                                         val card = cards[page]
-                                        val pageOffset = (
-                                            (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-                                        ).absoluteValue
+                                        val rawOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                                        val absOffset = rawOffset.absoluteValue.coerceIn(0f, 1f)
 
-                                        val cardScale by animateFloatAsState(
-                                            targetValue = if (pageOffset < 0.5f) 1f else 0.92f,
-                                            animationSpec = spring(stiffness = 300f),
-                                            label = "scale"
-                                        )
-                                        val cardAlpha by animateFloatAsState(
-                                            targetValue = if (pageOffset < 0.5f) 1f else 0.7f,
-                                            animationSpec = spring(stiffness = 300f),
-                                            label = "alpha"
-                                        )
+                                        // Smooth continuous card transformation during swipe
+                                        val cardScale = 1f - (absOffset * 0.08f)
+                                        val cardAlpha = 1f - (absOffset * 0.28f)
+                                        val rotationY = (-rawOffset * 10f).coerceIn(-18f, 18f)
 
                                         Box(
                                             modifier = Modifier
@@ -545,6 +541,8 @@ fun WalletHomeScreen(
                                                     scaleX = cardScale
                                                     scaleY = cardScale
                                                     alpha = cardAlpha
+                                                    cameraDistance = 16f * density
+                                                    this.rotationY = rotationY
                                                 }
                                         ) {
                                             CreditCardItem(
@@ -993,7 +991,7 @@ fun WalletHomeScreen(
 
 
 
-            // ================= 6. SLEEK CAMERA TEARDROP NOTCH PLUS BUTTON ATTACHED FROM BOTTOM =================
+            // ================= 6. SLEEK CAMERA TEARDROP NOTCH PLUS BUTTON & DRAG-UP ADD CARD ANIMATION =================
             if (!isOverlayOpen && !isVerticalStackMode && !isCardSelected && cardToDelete == null) {
                 Box(
                     modifier = Modifier
@@ -1001,13 +999,129 @@ fun WalletHomeScreen(
                         .navigationBarsPadding(),
                     contentAlignment = Alignment.BottomCenter
                 ) {
+                    // Emerging animated credit card pulling up from bottom slot
+                    if (addCardDragOffset.value > 2f) {
+                        val pullFraction = (addCardDragOffset.value / 180f).coerceIn(0f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .offset { IntOffset(0, -(addCardDragOffset.value * 1.35f).roundToInt()) }
+                                .padding(horizontal = 24.dp)
+                                .graphicsLayer {
+                                    scaleX = 0.88f + (pullFraction * 0.12f)
+                                    scaleY = 0.88f + (pullFraction * 0.12f)
+                                    alpha = (pullFraction * 1.4f).coerceIn(0f, 1f)
+                                    rotationX = (1f - pullFraction) * 16f
+                                    shadowElevation = 24f * pullFraction
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.92f)
+                                    .height(180.dp)
+                                    .shadow(20.dp, RoundedCornerShape(20.dp))
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(
+                                                Color(0xFF262032),
+                                                Color(0xFF181424),
+                                                Color(0xFF100D18)
+                                            )
+                                        )
+                                    )
+                                    .border(
+                                        width = 1.5.dp,
+                                        brush = Brush.linearGradient(
+                                            listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                Color.White.copy(alpha = 0.4f),
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                            )
+                                        ),
+                                        shape = RoundedCornerShape(20.dp)
+                                    )
+                                    .padding(20.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "NEW CARD",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 2.sp
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.Contactless,
+                                            contentDescription = null,
+                                            tint = Color.White.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(50.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(28.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "•••• •••• •••• ••••",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 14.sp,
+                                            letterSpacing = 2.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = if (addCardDragOffset.value >= 60f) "RELEASE TO ADD" else "SWIPE UP",
+                                            color = if (addCardDragOffset.value >= 60f) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     val teardropShape = remember { TeardropCameraNotchShape() }
                     Box(
                         modifier = Modifier
-                            .width(54.dp)
-                            .height(44.dp)
+                            .width(62.dp)
+                            .height(48.dp)
+                            .offset { IntOffset(0, -(addCardDragOffset.value * 0.25f).roundToInt()) }
                             .shadow(
-                                elevation = 8.dp,
+                                elevation = 8.dp + (addCardDragOffset.value * 0.05f).dp,
                                 shape = teardropShape,
                                 clip = false
                             )
@@ -1015,7 +1129,7 @@ fun WalletHomeScreen(
                             .background(
                                 Brush.verticalGradient(
                                     listOf(
-                                        Color(0xFF26262C),
+                                        Color(0xFF282830),
                                         Color(0xFF101014)
                                     )
                                 )
@@ -1024,15 +1138,70 @@ fun WalletHomeScreen(
                                 width = 1.dp,
                                 brush = Brush.verticalGradient(
                                     listOf(
-                                        Color.White.copy(alpha = 0.28f),
-                                        Color.White.copy(alpha = 0.06f)
+                                        Color.White.copy(alpha = 0.32f),
+                                        Color.White.copy(alpha = 0.08f)
                                     )
                                 ),
                                 shape = teardropShape
                             )
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onDragStart = {
+                                        lastAddCardHapticMilestone = 0f
+                                    },
+                                    onDragEnd = {
+                                        val currentPull = addCardDragOffset.value
+                                        if (currentPull >= 60f) {
+                                            haptics?.cardDraw()
+                                            coroutineScope.launch {
+                                                addCardDragOffset.animateTo(
+                                                    220f,
+                                                    spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                                                )
+                                                onAddNewCard()
+                                                addCardDragOffset.snapTo(0f)
+                                            }
+                                        } else {
+                                            coroutineScope.launch {
+                                                addCardDragOffset.animateTo(
+                                                    0f,
+                                                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                                                )
+                                            }
+                                        }
+                                        lastAddCardHapticMilestone = 0f
+                                    },
+                                    onDragCancel = {
+                                        coroutineScope.launch {
+                                            addCardDragOffset.animateTo(0f)
+                                        }
+                                        lastAddCardHapticMilestone = 0f
+                                    },
+                                    onVerticalDrag = { change, dragAmount ->
+                                        if (dragAmount < 0f || addCardDragOffset.value > 0f) {
+                                            change.consume()
+                                            val nextPull = (addCardDragOffset.value - dragAmount * 0.9f).coerceIn(0f, 240f)
+                                            coroutineScope.launch {
+                                                addCardDragOffset.snapTo(nextPull)
+                                            }
+                                            if (nextPull - lastAddCardHapticMilestone >= 18f) {
+                                                haptics?.cardDragTick()
+                                                lastAddCardHapticMilestone = nextPull
+                                            }
+                                        }
+                                    }
+                                )
+                            }
                             .clickable {
-                                haptics?.cardSelect()
-                                onAddNewCard()
+                                haptics?.cardDraw()
+                                coroutineScope.launch {
+                                    addCardDragOffset.animateTo(
+                                        160f,
+                                        spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
+                                    )
+                                    onAddNewCard()
+                                    addCardDragOffset.snapTo(0f)
+                                }
                             },
                         contentAlignment = Alignment.TopCenter
                     ) {
@@ -1040,15 +1209,15 @@ fun WalletHomeScreen(
                         Box(
                             modifier = Modifier
                                 .padding(top = 2.dp)
-                                .size(32.dp)
+                                .size(38.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFF08080C))
                                 .border(
                                     width = 1.dp,
                                     brush = Brush.radialGradient(
                                         listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
                                             Color(0x33FFFFFF)
                                         )
                                     ),
@@ -1060,7 +1229,7 @@ fun WalletHomeScreen(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = "Add Card",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                     }
