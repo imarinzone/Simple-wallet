@@ -18,13 +18,16 @@ object BiometricAuthManager {
             BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.BIOMETRIC_STRONG
         }
         val canAuth = biometricManager.canAuthenticate(authenticators)
-        return canAuth == BiometricManager.BIOMETRIC_SUCCESS
+        if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) return true
+
+        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+        return keyguardManager?.isDeviceSecure == true
     }
 
     fun promptBiometric(
         activity: FragmentActivity,
         title: String = "Unlock VaultFolio",
-        subtitle: String = "Verify your fingerprint or face recognition to access your cards",
+        subtitle: String = "Use fingerprint, face, or lock screen credentials to access your cards",
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -42,7 +45,7 @@ object BiometricAuthManager {
 
             override fun onAuthenticationFailed() {
                 super.onAuthenticationFailed()
-                onError("Biometric authentication failed. Please try again.")
+                onError("Authentication failed. Please try again.")
             }
         })
 
@@ -56,10 +59,20 @@ object BiometricAuthManager {
                     BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
                 )
             } catch (e: Exception) {
-                promptInfoBuilder.setNegativeButtonText("Use PIN")
+                @Suppress("DEPRECATION")
+                try {
+                    promptInfoBuilder.setDeviceCredentialAllowed(true)
+                } catch (ex: Exception) {
+                    promptInfoBuilder.setNegativeButtonText("Cancel")
+                }
             }
         } else {
-            promptInfoBuilder.setNegativeButtonText("Use PIN")
+            @Suppress("DEPRECATION")
+            try {
+                promptInfoBuilder.setDeviceCredentialAllowed(true)
+            } catch (e: Exception) {
+                promptInfoBuilder.setNegativeButtonText("Cancel")
+            }
         }
 
         try {

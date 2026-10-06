@@ -62,7 +62,7 @@ import com.example.ui.screens.CardDetailBottomSheet
 import com.example.ui.screens.EditCardDialog
 import com.example.ui.screens.NfcCardDetectedDialog
 import com.example.ui.screens.NfcScanScreen
-import com.example.ui.screens.SamsungWalletHomeScreen
+import com.example.ui.screens.WalletHomeScreen
 import com.example.ui.screens.ScanCardScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SyncBackupScreen
@@ -219,7 +219,7 @@ fun MainAppContent(
             // Cards are ONLY visible and interactive after successful biometric verification
             when (currentScreen) {
                 AppScreen.WALLET_HOME -> {
-                    SamsungWalletHomeScreen(
+                    WalletHomeScreen(
                         cards = cards,
                         onAddNewCard = {
                             haptics?.cardSelect()
@@ -242,6 +242,9 @@ fun MainAppContent(
                         },
                         onEditCard = {
                             viewModel.openCardEdit(it)
+                        },
+                        onReorderCards = {
+                            viewModel.reorderCards(it)
                         },
                         leatherFinish = leatherFinish,
                         isOverlayOpen = (selectedCardForEdit != null || selectedCardForDetail != null || showAddCardChooser || scannedPhysicalCard != null),

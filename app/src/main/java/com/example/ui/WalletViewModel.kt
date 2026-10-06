@@ -51,11 +51,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _selectedCardForDetail = MutableStateFlow<CardEntity?>(null)
     val selectedCardForDetail: StateFlow<CardEntity?> = _selectedCardForDetail.asStateFlow()
 
-    // Finger lock and app lock are strictly OPT-IN (default false). App does not start locked.
+    // Finger lock and app lock are strictly OPT-IN (default false).
     private val _isBiometricEnabled = MutableStateFlow(prefs.getBoolean("pref_biometric_enabled", false))
     val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
 
-    private val _isLocked = MutableStateFlow(false)
+    private val _isLocked = MutableStateFlow(prefs.getBoolean("pref_biometric_enabled", false))
     val isLocked: StateFlow<Boolean> = _isLocked.asStateFlow()
 
     private val _hasSuggestedLock = MutableStateFlow(prefs.getBoolean("pref_has_suggested_lock", false))
@@ -190,6 +190,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.saveCard(card)
             _selectedCardForDetail.value = card
+        }
+    }
+
+    fun reorderCards(reorderedList: List<CardEntity>) {
+        viewModelScope.launch {
+            repository.updateSlotIndices(reorderedList)
+            haptics.cardSlide()
         }
     }
 
