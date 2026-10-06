@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -144,21 +146,6 @@ fun NfcScanScreen(
         }
     }
 
-    fun copyAllCardDetails() {
-        val details = buildString {
-            appendLine("Title: ${cardTitle.ifBlank { "Card" }}")
-            if (rawCardNumber.isNotBlank()) appendLine("Card Number: $rawCardNumber")
-            if (cardholderName.isNotBlank()) appendLine("Cardholder: $cardholderName")
-            val exp = if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}" else rawExpiryDigits
-            if (exp.isNotBlank()) appendLine("Expiry: $exp")
-            if (cvv.isNotBlank()) appendLine("CVV: $cvv")
-            if (bankOrIssuer.isNotBlank()) appendLine("Issuer / Bank: $bankOrIssuer")
-            appendLine("Card Type: $cardType")
-            if (detectedCard?.nfcTagUid?.isNotBlank() == true) appendLine("NFC Tag UID: ${detectedCard?.nfcTagUid}")
-        }.trim()
-        copyToClipboard("All Info", details)
-    }
-
     // Start real NFC hardware listener
     DisposableEffect(Unit) {
         if (activity != null) {
@@ -178,6 +165,12 @@ fun NfcScanScreen(
                         val suggested = CardArtOnlineService.suggestArtForCard(card)
                         if (suggested != null) {
                             cardArtUrl = suggested.imageUrl
+                            if (bankOrIssuer.isBlank()) {
+                                bankOrIssuer = suggested.issuer
+                            }
+                            if (suggested.cardType.isNotBlank()) {
+                                cardType = if (suggested.cardType.uppercase().contains("DINER")) "DINERS" else suggested.cardType.uppercase()
+                            }
                         }
                     }
                 }
@@ -355,7 +348,7 @@ fun NfcScanScreen(
                         // Dynamic live preview card
                         val previewExpiry = if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
                         else if (rawExpiryDigits.length >= 2) "${rawExpiryDigits.take(2)}/"
-                        else rawExpiryDigits.ifBlank { "••/••" }
+                        else rawExpiryDigits
 
                         CreditCardItem(
                             card = CardEntity(
@@ -396,7 +389,7 @@ fun NfcScanScreen(
                             Spacer(modifier = Modifier.height(10.dp))
                         }
 
-                        // Quick Data Actions: Scrollable row with Copy All Info, Copy Number, Copy Name, Copy Expiry, Copy CVV
+                        // Quick Data Actions: Scrollable row with Copy Number, Copy Name, Copy Expiry, Copy CVV
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -404,17 +397,6 @@ fun NfcScanScreen(
                                 .padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            OutlinedButton(
-                                onClick = { copyAllCardDetails() },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
-                            ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Copy All Info", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                            }
-
                             if (rawCardNumber.isNotBlank()) {
                                 OutlinedButton(
                                     onClick = { copyToClipboard("Card Number", rawCardNumber) },
@@ -521,7 +503,8 @@ fun NfcScanScreen(
                                     clean.startsWith("4") -> "VISA"
                                     clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") || (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
                                     clean.startsWith("34") || clean.startsWith("37") -> "AMEX"
-                                    clean.startsWith("6011") || clean.startsWith("65") -> "DISCOVER"
+                                    clean.startsWith("36") || clean.startsWith("38") || clean.startsWith("30") || clean.startsWith("39") -> "DINERS"
+                                    clean.startsWith("60") || clean.startsWith("65") || clean.startsWith("81") || clean.startsWith("82") || clean.startsWith("508") || clean.startsWith("353") || clean.startsWith("356") -> "RUPAY"
                                     else -> cardType
                                 }
                             },
@@ -545,6 +528,56 @@ fun NfcScanScreen(
                             colors = fieldColors,
                             singleLine = true
                         )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Payment Network",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(
+                                    "VISA" to "Visa",
+                                    "MASTERCARD" to "Mastercard",
+                                    "DINERS" to "Diners Club",
+                                    "AMEX" to "AMEX",
+                                    "RUPAY" to "RuPay"
+                                ).forEach { (netKey, netLabel) ->
+                                    val isSelected = cardType.equals(netKey, ignoreCase = true) || (netKey == "DINERS" && cardType.uppercase().contains("DINER"))
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            haptics?.cardSelect()
+                                            cardType = netKey
+                                        },
+                                        label = {
+                                            Text(
+                                                text = netLabel,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                }
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(10.dp))
 

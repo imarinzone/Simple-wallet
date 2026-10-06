@@ -230,41 +230,22 @@ fun ScanCardScreen(
         }
     }
 
-    fun copyAllCardDetails() {
-        val exp = if (selectedCategoryType == CardCategoryType.PAYMENT && rawExpiryDigits.length >= 4) {
-            "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
-        } else rawExpiryDigits
+    var paymentNetwork by remember { mutableStateOf("VISA") }
 
-        val details = buildString {
-            if (title.isNotBlank()) appendLine("Card Label: $title")
-            if (rawCardNumber.isNotBlank()) appendLine("Card Number: $rawCardNumber")
-            if (cardholderName.isNotBlank()) appendLine("Cardholder: $cardholderName")
-            if (exp.isNotBlank()) appendLine("Valid Till / Expiry: $exp")
-            if (cvv.isNotBlank()) appendLine("CVV: $cvv")
-            if (bankOrIssuer.isNotBlank()) appendLine("Bank / Issuer: $bankOrIssuer")
-            appendLine("Category: ${selectedCategoryType.label}")
-        }.trim()
-        copyToClipboard("All Details", details)
-    }
-
-    // Determine card type string based on number or selected category
-    val currentCardType: String = when (selectedCategoryType) {
-        CardCategoryType.PAYMENT -> {
-            val clean = rawCardNumber.filter { it.isDigit() }
-            when {
-                clean.startsWith("4") -> "VISA"
-                clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") ||
-                        (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
-                clean.startsWith("34") || clean.startsWith("37") -> "AMEX"
-                clean.startsWith("6011") || clean.startsWith("65") -> "DISCOVER"
-                else -> "VISA"
-            }
+    fun updateNetworkFromPan(pan: String) {
+        val clean = pan.filter { it.isDigit() }
+        when {
+            clean.startsWith("4") -> paymentNetwork = "VISA"
+            clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") ||
+                    (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> paymentNetwork = "MASTERCARD"
+            clean.startsWith("34") || clean.startsWith("37") -> paymentNetwork = "AMEX"
+            clean.startsWith("36") || clean.startsWith("38") || clean.startsWith("30") || clean.startsWith("39") -> paymentNetwork = "DINERS"
+            clean.startsWith("60") || clean.startsWith("65") || clean.startsWith("81") || clean.startsWith("82") || clean.startsWith("508") || clean.startsWith("353") || clean.startsWith("356") -> paymentNetwork = "RUPAY"
         }
-        CardCategoryType.ID_CARD -> "ID_CARD"
-        CardCategoryType.RC_CARD -> "RC_CARD"
-        CardCategoryType.VOUCHER -> "VOUCHER"
-        CardCategoryType.MISC -> "MISC"
     }
+
+    // Determine card type string based on selected network or category
+    val currentCardType = if (selectedCategoryType == CardCategoryType.PAYMENT) paymentNetwork else selectedCategoryType.name
 
     fun searchArt() {
         isSearchingArt = true
@@ -306,6 +287,11 @@ fun ScanCardScreen(
                     }
                     cvv = result.card.cvv
                     bankOrIssuer = result.card.bankOrIssuer
+                    if (result.card.cardType.uppercase() in listOf("VISA", "MASTERCARD", "DINERS", "DINERS_CLUB", "DINNERCLUB", "AMEX", "RUPAY")) {
+                        paymentNetwork = if (result.card.cardType.uppercase().contains("DINER")) "DINERS" else result.card.cardType.uppercase()
+                    } else {
+                        updateNetworkFromPan(result.card.cardNumber)
+                    }
                     selectedCategoryType = when (result.card.cardType) {
                         "ID_CARD" -> CardCategoryType.ID_CARD
                         "RC_CARD" -> CardCategoryType.RC_CARD
@@ -327,6 +313,12 @@ fun ScanCardScreen(
                             cardArtUrl = suggested.imageUrl
                             selectedHex = suggested.accentColorHex
                             secondaryHex = suggested.gradientEndHex
+                            if (bankOrIssuer.isBlank()) {
+                                bankOrIssuer = suggested.issuer
+                            }
+                            if (suggested.cardType.isNotBlank()) {
+                                paymentNetwork = if (suggested.cardType.uppercase().contains("DINER")) "DINERS" else suggested.cardType.uppercase()
+                            }
                         }
                     }
                 }
@@ -599,6 +591,56 @@ fun ScanCardScreen(
                     }
                 }
 
+                if (selectedCategoryType == CardCategoryType.PAYMENT) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Payment Network",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            "VISA" to "Visa",
+                            "MASTERCARD" to "Mastercard",
+                            "DINERS" to "Diners Club",
+                            "AMEX" to "AMEX",
+                            "RUPAY" to "RuPay"
+                        ).forEach { (netKey, netLabel) ->
+                            val isSelected = paymentNetwork.equals(netKey, ignoreCase = true)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    haptics?.cardSelect()
+                                    paymentNetwork = netKey
+                                },
+                                label = {
+                                    Text(
+                                        text = netLabel,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Reconstructed live preview card (Flat, zero shadow)
@@ -656,7 +698,7 @@ fun ScanCardScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // Quick Copy Actions (Scrollable: Copy All Info, Copy Number, Copy Name, Copy Expiry, Copy CVV)
+                // Quick Copy Actions (Scrollable: Copy Number, Copy Name, Copy Expiry, Copy CVV)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -664,19 +706,6 @@ fun ScanCardScreen(
                         .padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { copyAllCardDetails() },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Copy All Info", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    }
-
                     if (rawCardNumber.isNotBlank()) {
                         OutlinedButton(
                             onClick = { copyToClipboard("Card Number", rawCardNumber) },
@@ -889,6 +918,13 @@ fun ScanCardScreen(
                                                 cardArtUrl = design.imageUrl
                                                 selectedHex = design.accentColorHex
                                                 secondaryHex = design.gradientEndHex
+                                                bankOrIssuer = design.issuer
+                                                if (title.isBlank() || title.contains("Card", ignoreCase = true)) {
+                                                    title = design.name
+                                                }
+                                                if (design.cardType.isNotBlank()) {
+                                                    paymentNetwork = if (design.cardType.uppercase().contains("DINER")) "DINERS" else design.cardType.uppercase()
+                                                }
                                             }
                                     ) {
                                         Column {

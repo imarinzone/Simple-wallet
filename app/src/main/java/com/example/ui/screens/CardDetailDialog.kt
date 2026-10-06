@@ -83,20 +83,6 @@ fun CardDetailBottomSheet(
         }
     }
 
-    fun copyAllCardDetails() {
-        val details = buildString {
-            appendLine("Title: ${card.title}")
-            if (card.cardNumber.isNotBlank()) appendLine("Card Number: ${card.cardNumber}")
-            if (card.cardholderName.isNotBlank()) appendLine("Cardholder: ${card.cardholderName}")
-            if (card.expiryDate.isNotBlank()) appendLine("Expiry: ${card.expiryDate}")
-            if (card.cvv.isNotBlank()) appendLine("CVV: ${card.cvv}")
-            if (card.bankOrIssuer.isNotBlank()) appendLine("Issuer / Bank: ${card.bankOrIssuer}")
-            appendLine("Card Type: ${card.cardType}")
-            if (card.nfcTagUid.isNotBlank()) appendLine("NFC Tag UID: ${card.nfcTagUid}")
-        }.trim()
-        copyToClipboard("All Details", details)
-    }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -176,23 +162,6 @@ fun CardDetailBottomSheet(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Prominent "Copy All Details" Action Button
-            OutlinedButton(
-                onClick = { copyAllCardDetails() },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.primary
-                ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
-            ) {
-                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Copy All Card Text & Details", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
             // Quick Data Actions: Separate Copy Number & Copy Name
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -229,20 +198,43 @@ fun CardDetailBottomSheet(
                 }
             }
 
-            if (card.cvv.isNotBlank()) {
+            if (card.expiryDate.isNotBlank() || card.cvv.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        copyToClipboard("CVV Code", card.cvv)
-                    },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.Security, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Copy CVV Code", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    if (card.expiryDate.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                copyToClipboard("Expiry Date", card.expiryDate)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                        ) {
+                            Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy Expiry", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    if (card.cvv.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                copyToClipboard("CVV Code", card.cvv)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                        ) {
+                            Icon(imageVector = Icons.Default.Security, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy CVV", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
 

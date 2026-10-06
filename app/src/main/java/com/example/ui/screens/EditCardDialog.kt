@@ -38,6 +38,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -349,6 +351,13 @@ fun EditCardDialog(
                                             cardArtUrl = design.imageUrl
                                             themeColorHex = design.accentColorHex
                                             gradientEndHex = design.gradientEndHex
+                                            bankOrIssuer = design.issuer
+                                            if (title.isBlank() || title.contains("Card", ignoreCase = true)) {
+                                                title = design.name
+                                            }
+                                            if (design.cardType.isNotBlank()) {
+                                                cardType = if (design.cardType.uppercase().contains("DINER")) "DINERS" else design.cardType.uppercase()
+                                            }
                                         }
                                 ) {
                                     Column {
@@ -429,6 +438,56 @@ fun EditCardDialog(
                 modifier = Modifier.fillMaxWidth(),
                 colors = fieldColors
             )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Payment Network",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        "VISA" to "Visa",
+                        "MASTERCARD" to "Mastercard",
+                        "DINERS" to "Diners Club",
+                        "AMEX" to "AMEX",
+                        "RUPAY" to "RuPay"
+                    ).forEach { (netKey, netLabel) ->
+                        val isSelected = cardType.equals(netKey, ignoreCase = true) || (netKey == "DINERS" && cardType.uppercase().contains("DINER"))
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                haptics?.cardSelect()
+                                cardType = netKey
+                            },
+                            label = {
+                                Text(
+                                    text = netLabel,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -515,6 +574,7 @@ fun EditCardDialog(
                         expiryDate = finalExpiry,
                         cvv = cvv,
                         bankOrIssuer = bankOrIssuer,
+                        cardType = cardType,
                         cardArtUrl = cardArtUrl,
                         themeColorHex = themeColorHex,
                         gradientEndHex = gradientEndHex,

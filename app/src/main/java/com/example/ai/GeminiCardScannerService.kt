@@ -416,15 +416,16 @@ object GeminiCardScannerService {
             val prompt = """
                 You are a high-security precision financial card scanner.
                 Inspect the uploaded card image carefully. Extract all discernible card information into JSON.
-                Detect the card type, issuer, embossed number, cardholder name, expiry date, CVV if visible, and prominent card colors.
+                Detect the card type, issuer, embossed number, cardholder name, expiry date (ONLY if explicitly printed on the card), CVV (ONLY if explicitly visible on the card), and prominent card colors.
+                IMPORTANT: Do NOT invent, guess, or output any dummy expiry dates (like 12/28) or CVVs. If not clearly visible, leave them as empty strings "".
                 
                 Respond ONLY with a valid JSON object matching this exact schema:
                 {
                   "title": "string (e.g. Sapphire Reserve or Platinum Card)",
                   "cardholderName": "string (in UPPERCASE as printed on the card)",
                   "cardNumber": "string (digits separated by spaces, e.g. 4123 4567 8901 2345)",
-                  "expiryDate": "string (format MM/YY)",
-                  "cvv": "string (3 or 4 digits if legible, else empty)",
+                  "expiryDate": "string (format MM/YY if explicitly printed, otherwise empty \"\")",
+                  "cvv": "string (3 or 4 digits if explicitly legible, otherwise empty \"\")",
                   "cardType": "VISA | MASTERCARD | AMEX | DISCOVER | ID_CARD | LOYALTY | TRANSIT",
                   "category": "PAYMENT | IDENTITY | MEMBERSHIP | TRANSIT",
                   "bankOrIssuer": "string (e.g. Chase, American Express, Citi, Wells Fargo)",

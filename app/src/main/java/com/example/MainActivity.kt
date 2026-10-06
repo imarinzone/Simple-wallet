@@ -244,6 +244,7 @@ fun MainAppContent(
                             viewModel.openCardEdit(it)
                         },
                         leatherFinish = leatherFinish,
+                        isOverlayOpen = (selectedCardForEdit != null || selectedCardForDetail != null || showAddCardChooser || scannedPhysicalCard != null),
                         haptics = haptics
                     )
                 }

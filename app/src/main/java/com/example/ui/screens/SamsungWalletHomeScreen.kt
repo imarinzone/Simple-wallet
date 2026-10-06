@@ -134,6 +134,7 @@ fun SamsungWalletHomeScreen(
     onToggleFavorite: (CardEntity) -> Unit,
     onEditCard: (CardEntity) -> Unit = {},
     leatherFinish: LeatherFinish,
+    isOverlayOpen: Boolean = false,
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
@@ -376,6 +377,9 @@ fun SamsungWalletHomeScreen(
                                     haptics?.stackCollapse()
                                     isVerticalStackMode = false
                                 },
+                                onEditCard = onEditCard,
+                                onDeleteCard = { card -> cardToDelete = card },
+                                onToggleFavorite = onToggleFavorite,
                                 haptics = haptics
                             )
                         } else {
@@ -766,32 +770,6 @@ fun SamsungWalletHomeScreen(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        OutlinedButton(
-                                            onClick = {
-                                                val details = buildString {
-                                                    appendLine("Title: ${activeCard.title}")
-                                                    if (activeCard.cardNumber.isNotBlank()) appendLine("Number: ${activeCard.cardNumber}")
-                                                    if (activeCard.cardholderName.isNotBlank()) appendLine("Cardholder: ${activeCard.cardholderName}")
-                                                    if (activeCard.expiryDate.isNotBlank()) appendLine("Expiry: ${activeCard.expiryDate}")
-                                                    if (activeCard.cvv.isNotBlank()) appendLine("CVV: ${activeCard.cvv}")
-                                                    if (activeCard.bankOrIssuer.isNotBlank()) appendLine("Issuer / Bank: ${activeCard.bankOrIssuer}")
-                                                    appendLine("Type: ${activeCard.cardType}")
-                                                    if (activeCard.nfcTagUid.isNotBlank()) appendLine("NFC Tag UID: ${activeCard.nfcTagUid}")
-                                                }.trim()
-                                                clipboardManager.setText(AnnotatedString(details))
-                                                haptics?.success()
-                                                Toast.makeText(context, "All card details copied", Toast.LENGTH_SHORT).show()
-                                            },
-                                            shape = RoundedCornerShape(12.dp),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-                                        ) {
-                                            Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(13.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Copy All", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-
                                         // Copy number button
                                         IconButton(
                                             onClick = {
@@ -876,7 +854,7 @@ fun SamsungWalletHomeScreen(
                                         Text("EXPIRES", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = activeCard.expiryDate.ifBlank { "••/••" },
+                                            text = activeCard.expiryDate.ifBlank { "Not set" },
                                             color = MaterialTheme.colorScheme.onSurface,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold,
@@ -897,8 +875,8 @@ fun SamsungWalletHomeScreen(
                                         Text("SECURITY CODE", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = if (isCardRevealed) activeCard.cvv.ifBlank { "•••" } else "•••",
-                                            color = if (isCardRevealed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            text = if (activeCard.cvv.isBlank()) "Not set" else if (isCardRevealed) activeCard.cvv else "•••",
+                                            color = if (isCardRevealed && activeCard.cvv.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1
@@ -999,59 +977,61 @@ fun SamsungWalletHomeScreen(
 
 
 
-            // ================= 6. BOTTOM BAR: SHOW ONLY THE ADD BUTTON =================
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp
-            ) {
-                Box(
+            // ================= 6. BOTTOM BAR: SHOW ONLY ON MAIN HOME PAGE =================
+            if (!isOverlayOpen && !isVerticalStackMode && !isCardSelected && cardToDelete == null) {
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .navigationBarsPadding(),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp
                 ) {
-                    ElevatedButton(
-                        onClick = {
-                            haptics?.cardSelect()
-                            onAddNewCard()
-                        },
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.elevatedButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        elevation = ButtonDefaults.elevatedButtonElevation(6.dp)
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                        ElevatedButton(
+                            onClick = {
+                                haptics?.cardSelect()
+                                onAddNewCard()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = ButtonDefaults.elevatedButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            elevation = ButtonDefaults.elevatedButtonElevation(6.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.onPrimary),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Add Card",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.onPrimary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Add Card",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Add to Wallet",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.3.sp
                                 )
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Add to Wallet",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.3.sp
-                            )
                         }
                     }
                 }
@@ -1095,6 +1075,7 @@ fun SamsungWalletHomeScreen(
 /**
  * Samsung Wallet style vertical stacked cards view where cards overlap
  * and users can see all cards stacked on top of each other.
+ * Selecting a card in the stack smoothly reveals full card details.
  */
 @Composable
 private fun VerticalStackedCardsView(
@@ -1102,49 +1083,31 @@ private fun VerticalStackedCardsView(
     selectedIndex: Int,
     onSelectCard: (Int) -> Unit,
     onCollapseToCarousel: () -> Unit,
+    onEditCard: (CardEntity) -> Unit,
+    onDeleteCard: (CardEntity) -> Unit,
+    onToggleFavorite: (CardEntity) -> Unit,
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
-    var totalDragY by remember { mutableFloatStateOf(0f) }
-    var lastHapticMilestone by remember { mutableFloatStateOf(0f) }
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    var isNumberRevealed by remember { mutableStateOf(false) }
+    var isCvvRevealed by remember { mutableStateOf(false) }
+
+    val safeIndex = selectedIndex.coerceIn(0, (cards.size - 1).coerceAtLeast(0))
+    val activeCard = cards.getOrNull(safeIndex)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        totalDragY = 0f
-                        lastHapticMilestone = 0f
-                    },
-                    onDragEnd = {
-                        if (totalDragY > 36f || totalDragY < -40f) {
-                            // Dragged down (or swiped up): return to carousel with solid collapse
-                            haptics?.stackCollapse()
-                            onCollapseToCarousel()
-                        }
-                        totalDragY = 0f
-                        lastHapticMilestone = 0f
-                    },
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        totalDragY += dragAmount
-                        // Subtle tactile tick as user drags
-                        if (Math.abs(totalDragY - lastHapticMilestone) >= 16f) {
-                            haptics?.cardDragTick()
-                            lastHapticMilestone = totalDragY
-                        }
-                    }
-                )
-            }
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Stack Mode Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp),
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1153,13 +1116,13 @@ private fun VerticalStackedCardsView(
                     imageVector = Icons.Default.Layers,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "ALL CARDS STACK (${cards.size})",
+                    text = "STACK VIEW (${cards.size})",
                     color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
@@ -1185,7 +1148,6 @@ private fun VerticalStackedCardsView(
         Spacer(modifier = Modifier.height(6.dp))
 
         // Overlapping Stack of Cards (Samsung Wallet layout)
-        val stackItemSpacing = 72.dp
         val totalStackHeight = 210.dp + ((cards.size - 1).coerceAtLeast(0) * 72).dp
 
         Box(
@@ -1195,13 +1157,23 @@ private fun VerticalStackedCardsView(
         ) {
             cards.forEachIndexed { index, card ->
                 val topOffset = (index * 72).dp
-                val isSelected = index == selectedIndex
+                val isSelected = index == safeIndex
+
+                val cardScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.02f else 1f,
+                    animationSpec = spring(stiffness = 400f),
+                    label = "scale"
+                )
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .offset(y = topOffset)
                         .zIndex(if (isSelected) 100f else index.toFloat())
+                        .graphicsLayer {
+                            scaleX = cardScale
+                            scaleY = cardScale
+                        }
                         .clickable {
                             haptics?.cardDraw()
                             onSelectCard(index)
@@ -1209,7 +1181,7 @@ private fun VerticalStackedCardsView(
                 ) {
                     CreditCardItem(
                         card = card,
-                        enableTiltSensor = true,
+                        enableTiltSensor = isSelected,
                         haptics = haptics,
                         onCardClick = {
                             haptics?.cardDraw()
@@ -1218,7 +1190,7 @@ private fun VerticalStackedCardsView(
                     )
 
                     if (isSelected) {
-                        // Samsung Wallet "ACTIVE" card indicator badge
+                        // Samsung Wallet "SELECTED" card indicator badge
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
@@ -1237,7 +1209,7 @@ private fun VerticalStackedCardsView(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "ACTIVE",
+                                    text = "SELECTED",
                                     color = MaterialTheme.colorScheme.primary,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold
@@ -1249,7 +1221,307 @@ private fun VerticalStackedCardsView(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ================= SELECTED CARD DETAILS (Samsung Wallet Stack View) =================
+        if (activeCard != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f), RoundedCornerShape(22.dp))
+                    .padding(18.dp)
+            ) {
+                Column {
+                    // Card Title & Issuer Header + Quick Actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = activeCard.title.ifBlank { "Card Details" },
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${activeCard.bankOrIssuer.ifBlank { "Bank" }} • ${activeCard.cardType}",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Favorite Toggle Button
+                            IconButton(
+                                onClick = {
+                                    haptics?.cardSelect()
+                                    onToggleFavorite(activeCard.copy(isFavorite = !activeCard.isFavorite))
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Icon(
+                                    imageVector = if (activeCard.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                    contentDescription = "Favorite",
+                                    tint = if (activeCard.isFavorite) Color(0xFFE5A93C) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Card Number Row with Mask/Unmask and Copy
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "CARD NUMBER",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isNumberRevealed) activeCard.cardNumber.ifBlank { "•••• •••• •••• ••••" } else activeCard.maskedNumber,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 14.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    haptics?.cardSelect()
+                                    isNumberRevealed = !isNumberRevealed
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isNumberRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (isNumberRevealed) "Hide" else "Show",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    haptics?.cardSelect()
+                                    clipboardManager.setText(AnnotatedString(activeCard.cardNumber))
+                                    Toast.makeText(context, "Card number copied", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Information Grid: Cardholder, Expiry, CVV
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        // Cardholder
+                        Column(
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable {
+                                    if (activeCard.cardholderName.isNotBlank()) {
+                                        clipboardManager.setText(AnnotatedString(activeCard.cardholderName))
+                                        Toast.makeText(context, "Cardholder copied", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Text("CARDHOLDER", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = activeCard.cardholderName.ifBlank { "Not set" },
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Expiry
+                        Column(
+                            modifier = Modifier
+                                .weight(0.9f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable {
+                                    if (activeCard.expiryDate.isNotBlank()) {
+                                        clipboardManager.setText(AnnotatedString(activeCard.expiryDate))
+                                        Toast.makeText(context, "Expiry copied", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Text("EXPIRES", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = activeCard.expiryDate.ifBlank { "Not set" },
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // CVV
+                        Column(
+                            modifier = Modifier
+                                .weight(0.9f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable {
+                                    if (activeCard.cvv.isNotBlank()) {
+                                        isCvvRevealed = !isCvvRevealed
+                                        clipboardManager.setText(AnnotatedString(activeCard.cvv))
+                                        Toast.makeText(context, "CVV copied", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Text("CVV / CVC", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = if (activeCard.cvv.isBlank()) "Not set" else if (isCvvRevealed) activeCard.cvv else "•••",
+                                color = if (isCvvRevealed && activeCard.cvv.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                fontSize = 13.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    // NFC Tag Telemetry if present
+                    if (activeCard.nfcTagUid.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF0369A1).copy(alpha = 0.2f))
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sensors,
+                                contentDescription = null,
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "NFC Tag UID: ${activeCard.nfcTagUid}",
+                                color = Color(0xFF38BDF8),
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Quick Edit & Delete actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                haptics?.cardSelect()
+                                onEditCard(activeCard)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Card & Artwork",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Edit Card & Artwork",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        TextButton(
+                            onClick = {
+                                haptics?.cardSelect()
+                                onDeleteCard(activeCard)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color(0xFFEF4444).copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Remove Card",
+                                color = Color(0xFFEF4444).copy(alpha = 0.8f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
     }
 }
 

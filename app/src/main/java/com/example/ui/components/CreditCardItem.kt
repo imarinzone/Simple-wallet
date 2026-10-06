@@ -327,25 +327,27 @@ private fun CardFrontContent(
                     )
                 }
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Text(
-                        text = "EXPIRES",
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = card.expiryDate.ifBlank { "••/••" },
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
-                    )
+                if (card.expiryDate.isNotBlank()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "EXPIRES",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = card.expiryDate,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
                 }
 
                 CardNetworkLogoBadge(cardType = card.cardType)
@@ -422,7 +424,7 @@ private fun CardBackContent(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (showFullCvv) card.cvv.ifBlank { "•••" } else "•••",
+                    text = if (card.cvv.isBlank()) "Not set" else if (showFullCvv) card.cvv else "•••",
                     color = m3Theme.onTertiaryContainer,
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
@@ -572,6 +574,38 @@ fun CardNetworkLogoBadge(cardType: String, modifier: Modifier = Modifier) {
                     color = Color.White,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold
+                )
+            }
+        }
+        "RUPAY" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF00796B))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "RuPay",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.5.sp
+                )
+            }
+        }
+        "DINERS", "DINERS_CLUB", "DINNERCLUB" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF004B87))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "Diners Club",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.5.sp
                 )
             }
         }
