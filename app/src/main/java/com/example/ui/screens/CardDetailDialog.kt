@@ -360,7 +360,7 @@ fun CardDetailBottomSheet(
             ) {
                 Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Edit Card & Online Art", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text("Edit Card & Artwork", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
 
             Spacer(modifier = Modifier.height(10.dp))

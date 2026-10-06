@@ -215,7 +215,7 @@ fun EditCardDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Authentic Web Card Art",
+                        text = "Official Card Artwork",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -238,7 +238,7 @@ fun EditCardDialog(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Fetch Artwork Button
+            // Choose Official Artwork Button
             OutlinedButton(
                 onClick = {
                     haptics?.cardSelect()
@@ -262,7 +262,7 @@ fun EditCardDialog(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (showArtPickerSection) "Hide Artwork Gallery" else "Fetch Actual Card Art from Web",
+                    text = if (showArtPickerSection) "Hide Artwork Gallery" else "Select Official Card Artwork",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
@@ -278,7 +278,7 @@ fun EditCardDialog(
                         .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
                         .padding(14.dp)
                 ) {
-                    // Search bar for card designs
+                    // Search bar for official cards
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -286,7 +286,7 @@ fun EditCardDialog(
                         OutlinedTextField(
                             value = artSearchQuery,
                             onValueChange = { artSearchQuery = it },
-                            placeholder = { Text("Search (e.g. Chase, Amex, Apple)", fontSize = 12.sp) },
+                            placeholder = { Text("Filter cards (e.g. Millennia, Swiggy, Tata, Shaurya)", fontSize = 12.sp) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             colors = fieldColors,
@@ -312,14 +312,14 @@ fun EditCardDialog(
                         }
                     } else if (searchResults.isEmpty()) {
                         Text(
-                            text = "No card art designs found. Try searching for 'Chase', 'Amex', 'Citi', 'Apple', or 'Capital One'.",
+                            text = "No cards matching filter. Try 'HDFC', 'SBI', 'Millennia', 'Swiggy', or 'Tata'.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     } else {
                         Text(
-                            text = "Select an authentic card face design:",
+                            text = "Select official bank card artwork:",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -468,7 +468,7 @@ fun EditCardDialog(
                         rawExpiryDigits = input.filter { it.isDigit() }.take(4)
                     },
                     label = { Text("Expiry (MM/YY)") },
-                    placeholder = { Text("12/28") },
+                    placeholder = { Text("MM/YY") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1.2f),
                     colors = fieldColors,
@@ -553,11 +553,11 @@ fun EditCardDialog(
                 )
             },
             title = {
-                Text("Enable Online Card Art?", fontWeight = FontWeight.Bold)
+                Text("Enable Official Card Artwork?", fontWeight = FontWeight.Bold)
             },
             text = {
                 Text(
-                    "Fetching real card artwork from the internet is currently turned off in Settings. Would you like to enable it now?",
+                    "Displaying official card designs is currently turned off in Settings. Would you like to enable it now?",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
@@ -574,7 +574,7 @@ fun EditCardDialog(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text("Turn On & Fetch", fontWeight = FontWeight.Bold)
+                    Text("Turn On", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

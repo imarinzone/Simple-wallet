@@ -605,7 +605,7 @@ fun ScanCardScreen(
                 val previewExpiry = if (selectedCategoryType == CardCategoryType.PAYMENT) {
                     if (rawExpiryDigits.length >= 4) "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
                     else if (rawExpiryDigits.length >= 2) "${rawExpiryDigits.take(2)}/"
-                    else rawExpiryDigits.ifBlank { "12/28" }
+                    else rawExpiryDigits
                 } else rawExpiryDigits
 
                 val previewCard = CardEntity(
@@ -748,7 +748,7 @@ fun ScanCardScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Authentic Web Card Art",
+                            text = "Official Card Artwork",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -797,7 +797,7 @@ fun ScanCardScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (showArtPickerSection) "Hide Artwork Gallery" else "Fetch Actual Card Art from Web",
+                        text = if (showArtPickerSection) "Hide Artwork Gallery" else "Select Official Card Artwork",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
@@ -820,7 +820,7 @@ fun ScanCardScreen(
                             OutlinedTextField(
                                 value = artSearchQuery,
                                 onValueChange = { artSearchQuery = it },
-                                placeholder = { Text("Search issuer/card (e.g. Chase, Amex, Apple)", fontSize = 12.sp) },
+                                placeholder = { Text("Filter cards (e.g. Millennia, Swiggy, Tata, Shaurya)", fontSize = 12.sp) },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -853,14 +853,14 @@ fun ScanCardScreen(
                             }
                         } else if (searchResults.isEmpty()) {
                             Text(
-                                text = "No card art designs found. Try searching for 'Chase', 'Amex', 'Citi', 'Apple', or 'Capital One'.",
+                                text = "No cards matching filter. Try 'HDFC', 'SBI', 'Millennia', 'Swiggy', or 'Tata'.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         } else {
                             Text(
-                                text = "Tap a design to apply authentic card look:",
+                                text = "Tap a design to apply official card artwork:",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
@@ -1084,7 +1084,7 @@ fun ScanCardScreen(
                                 if (isPayment) "Expiry (MM/YY)" else "Valid Till (Optional)"
                             )
                         },
-                        placeholder = { Text(if (isPayment) "12/28" else "MM/YY or YYYY") },
+                        placeholder = { Text(if (isPayment) "MM/YY" else "MM/YY or YYYY") },
                         visualTransformation = if (isPayment) ExpiryDateVisualTransformation() else VisualTransformation.None,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = if (isPayment) KeyboardType.Number else KeyboardType.Ascii
@@ -1268,11 +1268,11 @@ fun ScanCardScreen(
                 )
             },
             title = {
-                Text("Enable Online Card Art?", fontWeight = FontWeight.Bold)
+                Text("Enable Official Card Artwork?", fontWeight = FontWeight.Bold)
             },
             text = {
                 Text(
-                    "Fetching real card artwork from the internet is currently turned off in Settings. Would you like to enable it now?",
+                    "Displaying official bank card designs is currently turned off in Settings. Would you like to enable it now?",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
@@ -1290,7 +1290,7 @@ fun ScanCardScreen(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text("Turn On & Fetch", fontWeight = FontWeight.Bold)
+                    Text("Turn On", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

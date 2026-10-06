@@ -956,7 +956,7 @@ fun SamsungWalletHomeScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Edit Card & Web Art",
+                                            text = "Edit Card & Artwork",
                                             color = MaterialTheme.colorScheme.primary,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.SemiBold

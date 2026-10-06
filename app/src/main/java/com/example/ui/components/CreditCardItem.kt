@@ -280,12 +280,15 @@ private fun CardFrontContent(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Dynamic Metallic EMV Chip
-                EmvChipView(
-                    baseColor = m3Theme.chipBaseColor,
-                    detailColor = m3Theme.chipDetailColor
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                // Only render digital metallic EMV chip if no authentic artwork is present
+                // (Official card facias already print the authentic physical chip on the artwork)
+                if (card.cardArtUrl.isBlank()) {
+                    EmvChipView(
+                        baseColor = m3Theme.chipBaseColor,
+                        detailColor = m3Theme.chipDetailColor
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
                 Text(
                     text = card.maskedNumber,
                     color = Color.White,

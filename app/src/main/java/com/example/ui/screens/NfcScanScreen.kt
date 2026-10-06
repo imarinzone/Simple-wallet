@@ -582,7 +582,7 @@ fun NfcScanScreen(
                                     rawExpiryDigits = input.filter { it.isDigit() }.take(4)
                                 },
                                 label = { Text("Expiry (MM/YY)") },
-                                placeholder = { Text("12/28") },
+                                placeholder = { Text("MM/YY") },
                                 visualTransformation = NfcExpiryDateVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 trailingIcon = {

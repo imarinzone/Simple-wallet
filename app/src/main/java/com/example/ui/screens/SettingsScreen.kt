@@ -363,9 +363,9 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. CARD ARTWORK & WEB DESIGNS (DEFAULT OFF)
+            // 4. CARD ARTWORK & OFFICIAL DESIGNS
             Text(
-                text = "Card Appearance & Web Art",
+                text = "Official Card Artwork",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -386,14 +386,14 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                             Text(
-                                text = "Fetch Card Art from Web",
+                                text = "Show Official Card Artwork",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Search and download official card designs to display the real look & feel of your cards.",
+                                text = "Display official card designs for HDFC and SBI cards from their official portals.",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
