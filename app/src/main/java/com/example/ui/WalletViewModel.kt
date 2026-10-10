@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.AppDatabase
+import com.example.data.AppUpdateInfo
+import com.example.data.AppUpdateService
 import com.example.data.CardEntity
 import com.example.data.WalletRepository
 import com.example.security.HapticSensitivity
@@ -111,8 +113,74 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _selectedCardForEdit = MutableStateFlow<CardEntity?>(null)
     val selectedCardForEdit: StateFlow<CardEntity?> = _selectedCardForEdit.asStateFlow()
 
+    // ================= APP UPDATES MANAGEMENT =================
+    private val _autoCheckUpdates = MutableStateFlow(prefs.getBoolean("pref_auto_check_updates", true))
+    val autoCheckUpdates: StateFlow<Boolean> = _autoCheckUpdates.asStateFlow()
+
+    private val _appUpdateInfo = MutableStateFlow<AppUpdateInfo?>(null)
+    val appUpdateInfo: StateFlow<AppUpdateInfo?> = _appUpdateInfo.asStateFlow()
+
+    private val _isCheckingForUpdates = MutableStateFlow(false)
+    val isCheckingForUpdates: StateFlow<Boolean> = _isCheckingForUpdates.asStateFlow()
+
+    private val _updateStatusMessage = MutableStateFlow<String?>(null)
+    val updateStatusMessage: StateFlow<String?> = _updateStatusMessage.asStateFlow()
+
+    private val _showUpdatePromptOnLaunch = MutableStateFlow(false)
+    val showUpdatePromptOnLaunch: StateFlow<Boolean> = _showUpdatePromptOnLaunch.asStateFlow()
+
     init {
         haptics.sensitivity = _hapticSensitivity.value
+
+        // Check for updates automatically on app launch if enabled
+        if (_autoCheckUpdates.value) {
+            viewModelScope.launch {
+                val lastDismissedCode = prefs.getInt("pref_dismissed_update_version", 0)
+                val info = AppUpdateService.checkForUpdates()
+                _appUpdateInfo.value = info
+                if (info.isUpdateAvailable && info.latestVersionCode > lastDismissedCode) {
+                    _showUpdatePromptOnLaunch.value = true
+                }
+            }
+        }
+    }
+
+    fun checkForAppUpdates(manual: Boolean = true, forceAvailable: Boolean? = null) {
+        viewModelScope.launch {
+            _isCheckingForUpdates.value = true
+            _updateStatusMessage.value = null
+            try {
+                val info = AppUpdateService.checkForUpdates(forceAvailableForTest = forceAvailable)
+                _appUpdateInfo.value = info
+                if (info.isUpdateAvailable) {
+                    _showUpdatePromptOnLaunch.value = true
+                    _updateStatusMessage.value = "New update v${info.latestVersionName} available!"
+                    haptics.success()
+                } else {
+                    _updateStatusMessage.value = "You are up to date! (v${info.currentVersionName})"
+                    haptics.cardSelect()
+                }
+            } catch (_: Exception) {
+                _updateStatusMessage.value = "Unable to check for updates right now"
+            } finally {
+                _isCheckingForUpdates.value = false
+            }
+        }
+    }
+
+    fun setAutoCheckUpdates(enabled: Boolean) {
+        _autoCheckUpdates.value = enabled
+        prefs.edit().putBoolean("pref_auto_check_updates", enabled).apply()
+        haptics.cardSelect()
+    }
+
+    fun dismissUpdatePrompt(rememberDismissed: Boolean = false) {
+        _showUpdatePromptOnLaunch.value = false
+        if (rememberDismissed) {
+            _appUpdateInfo.value?.latestVersionCode?.let { code ->
+                prefs.edit().putInt("pref_dismissed_update_version", code).apply()
+            }
+        }
     }
 
     fun onPhysicalNfcCardScanned(card: CardEntity) {
@@ -244,6 +312,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun openCardEdit(card: CardEntity) {
+        _selectedCardForDetail.value = null
         _selectedCardForEdit.value = card
     }
 

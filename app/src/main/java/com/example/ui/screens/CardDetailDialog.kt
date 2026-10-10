@@ -117,13 +117,14 @@ fun CardDetailBottomSheet(
                     IconButton(
                         onClick = {
                             haptics?.cardSelect()
-                            onToggleFavorite(card.copy(isFavorite = !card.isFavorite))
+                            clipboardManager.setText(AnnotatedString(card.cardNumber))
+                            copiedLabel = "Card Number"
                         }
                     ) {
                         Icon(
-                            imageVector = if (card.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (card.isFavorite) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy Card Number",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
 

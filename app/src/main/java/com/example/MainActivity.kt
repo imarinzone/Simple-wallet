@@ -8,22 +8,27 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,14 +57,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.AppUpdateService
 import com.example.nfc.NfcCardReaderManager
 import com.example.security.BiometricAuthManager
 import com.example.ui.AppScreen
 import com.example.ui.WalletViewModel
 import com.example.ui.components.BiometricLockOverlay
 import com.example.ui.screens.AddCardChooserBottomSheet
+import com.example.ui.screens.AndroidLockScreenPinSetupScreen
 import com.example.ui.screens.CardDetailBottomSheet
 import com.example.ui.screens.EditCardDialog
+import com.example.ui.screens.EditCardScreen
 import com.example.ui.screens.NfcCardDetectedDialog
 import com.example.ui.screens.NfcScanScreen
 import com.example.ui.screens.WalletHomeScreen
@@ -168,6 +176,12 @@ fun MainAppContent(
     val isOnlineCardArtEnabled by viewModel.isOnlineCardArtEnabled.collectAsState()
     val selectedCardForEdit by viewModel.selectedCardForEdit.collectAsState()
     val selectedCardForDetail by viewModel.selectedCardForDetail.collectAsState()
+    val autoCheckUpdates by viewModel.autoCheckUpdates.collectAsState()
+    val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
+    val isCheckingForUpdates by viewModel.isCheckingForUpdates.collectAsState()
+    val updateStatusMessage by viewModel.updateStatusMessage.collectAsState()
+    val showUpdatePromptOnLaunch by viewModel.showUpdatePromptOnLaunch.collectAsState()
+    var showUpdateDetailsDialog by remember { mutableStateOf(false) }
 
     var showAddCardChooser by remember { mutableStateOf(false) }
     var startInManualMode by remember { mutableStateOf(false) }
@@ -299,6 +313,13 @@ fun MainAppContent(
                         onHapticSensitivityChange = { viewModel.setHapticSensitivity(it) },
                         isOnlineCardArtEnabled = isOnlineCardArtEnabled,
                         onToggleOnlineCardArt = { viewModel.toggleOnlineCardArt(it) },
+                        autoCheckUpdates = autoCheckUpdates,
+                        onToggleAutoCheckUpdates = { viewModel.setAutoCheckUpdates(it) },
+                        isCheckingForUpdates = isCheckingForUpdates,
+                        updateStatusMessage = updateStatusMessage,
+                        onCheckForUpdates = { viewModel.checkForAppUpdates(manual = true) },
+                        appUpdateInfo = appUpdateInfo,
+                        onShowUpdateDetails = { showUpdateDetailsDialog = true },
                         onNavigateBack = { viewModel.navigateTo(AppScreen.WALLET_HOME) },
                         haptics = haptics
                     )
@@ -408,69 +429,25 @@ fun MainAppContent(
                         shape = RoundedCornerShape(22.dp)
                     )
                 } else {
-                    AlertDialog(
-                        onDismissRequest = { viewModel.dismissLockSuggestion() },
-                        title = {
-                            Text(
-                                text = "Set 4-Digit Master PIN",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
+                    AndroidLockScreenPinSetupScreen(
+                        currentPin = masterPin,
+                        onPinSaved = { newPin ->
+                            viewModel.setMasterPin(newPin)
+                            viewModel.enableLockFromSuggestion()
+                            showSetupPinPrompt = false
                         },
-                        text = {
-                            Column {
-                                Text(
-                                    text = "Create a 4-digit PIN to use whenever fingerprint is unavailable.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 13.sp
-                                )
-                                Spacer(modifier = Modifier.height(14.dp))
-                                OutlinedTextField(
-                                    value = initialPinInput,
-                                    onValueChange = { input ->
-                                        initialPinInput = input.filter { it.isDigit() }.take(4)
-                                    },
-                                    placeholder = { Text("e.g. 2580") },
-                                    label = { Text("4-Digit PIN") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                        onDismiss = {
+                            showSetupPinPrompt = false
+                            viewModel.dismissLockSuggestion()
                         },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    val finalPin = if (initialPinInput.length == 4) initialPinInput else "1234"
-                                    viewModel.setMasterPin(finalPin)
-                                    viewModel.enableLockFromSuggestion()
-                                },
-                                enabled = initialPinInput.length == 4,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                ),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Save & Enable", fontWeight = FontWeight.Bold)
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = { viewModel.dismissLockSuggestion() }
-                            ) {
-                                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        },
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(22.dp)
+                        haptics = haptics
                     )
                 }
             }
 
-            // Edit Card Dialog
+            // Dedicated Full-Page Screen for Card & Artwork Editing
             if (selectedCardForEdit != null) {
-                EditCardDialog(
+                EditCardScreen(
                     card = selectedCardForEdit!!,
                     isOnlineCardArtEnabled = isOnlineCardArtEnabled,
                     onDismiss = { viewModel.closeCardEdit() },
@@ -489,6 +466,142 @@ fun MainAppContent(
                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                     onEditCard = { viewModel.openCardEdit(it) },
                     haptics = haptics
+                )
+            }
+
+            // ================= 7. APP UPDATE PROMPT ON LAUNCH / DETECTED =================
+            if (showUpdatePromptOnLaunch && appUpdateInfo?.isUpdateAvailable == true) {
+                val update = appUpdateInfo!!
+                AlertDialog(
+                    onDismissRequest = { viewModel.dismissUpdatePrompt(rememberDismissed = false) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = "New Update Available!",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 19.sp
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Simple Wallet v${update.latestVersionName} is now ready to download (Current: v${update.currentVersionName}).",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .padding(12.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "What's new in this release:",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    update.releaseNotes.take(3).forEach { note ->
+                                        Text(
+                                            text = "• $note",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                haptics?.success()
+                                viewModel.dismissUpdatePrompt(rememberDismissed = true)
+                                AppUpdateService.openDownloadPage(activity, update.downloadUrl)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Download Now", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.dismissUpdatePrompt(rememberDismissed = true)
+                            }
+                        ) {
+                            Text("Later", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(24.dp)
+                )
+            }
+
+            // Update Details / Release Notes Modal Dialog
+            if (showUpdateDetailsDialog && appUpdateInfo != null) {
+                val update = appUpdateInfo!!
+                AlertDialog(
+                    onDismissRequest = { showUpdateDetailsDialog = false },
+                    title = {
+                        Text(
+                            text = "Release Notes v${update.latestVersionName}",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Package Size: ${update.apkSizeMb} • Released: ${update.releaseDate}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            update.releaseNotes.forEach { note ->
+                                Text(
+                                    text = "• $note",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showUpdateDetailsDialog = false
+                                AppUpdateService.openDownloadPage(activity, update.downloadUrl)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Download")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showUpdateDetailsDialog = false }) {
+                            Text("Close")
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(20.dp)
                 )
             }
         }

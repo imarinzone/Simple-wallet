@@ -165,6 +165,7 @@ fun Modifier.sensor3DTilt(
             rotationX = rotX
             rotationY = rotY
             cameraDistance = 16f * density.density
+            shadowElevation = 0f
         }
         .drawWithContent {
             drawContent()

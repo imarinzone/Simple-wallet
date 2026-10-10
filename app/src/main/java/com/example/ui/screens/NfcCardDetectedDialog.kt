@@ -74,15 +74,6 @@ fun NfcCardDetectedDialog(
     var enteredCvv by remember { mutableStateOf(card.cvv) }
     var showFullNumber by remember { mutableStateOf(false) }
     var showCvvInput by remember { mutableStateOf(false) }
-    var copiedLabel by remember { mutableStateOf<String?>(null) }
-
-    fun copyToClipboard(label: String, text: String) {
-        if (text.isNotBlank()) {
-            clipboardManager.setText(AnnotatedString(text))
-            haptics?.success()
-            copiedLabel = label
-        }
-    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -154,61 +145,6 @@ fun NfcCardDetectedDialog(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Copied notification banner
-            if (copiedLabel != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF34D399).copy(alpha = 0.2f))
-                        .padding(horizontal = 14.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "✓ $copiedLabel Copied to Clipboard",
-                        color = Color(0xFF34D399),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            // Quick Data Actions: Copy Number & Copy Name separately
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        copyToClipboard("Card Number", card.cardNumber)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                ) {
-                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Copy Number", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-
-                if (card.cardholderName.isNotBlank()) {
-                    OutlinedButton(
-                        onClick = {
-                            copyToClipboard("Cardholder Name", card.cardholderName)
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                    ) {
-                        Icon(imageVector = Icons.Default.Person, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Copy Name", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
             // Card Information Section with Number Reveal Button
             Column(
                 modifier = Modifier
@@ -270,19 +206,6 @@ fun NfcCardDetectedDialog(
                                 modifier = Modifier.size(16.dp)
                             )
                         }
-
-                        // Copy Number Button
-                        IconButton(
-                            onClick = { copyToClipboard("Card Number", card.cardNumber) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copy Number",
-                                tint = Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
                     }
                 }
 
@@ -306,20 +229,6 @@ fun NfcCardDetectedDialog(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
                             )
-
-                            Spacer(modifier = Modifier.width(4.dp))
-
-                            IconButton(
-                                onClick = { copyToClipboard("Cardholder Name", card.cardholderName) },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy Name",
-                                    tint = Color.White.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(15.dp)
-                                )
-                            }
                         }
                     }
                 }

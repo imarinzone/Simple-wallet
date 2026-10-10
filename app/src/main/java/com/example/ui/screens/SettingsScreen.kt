@@ -22,15 +22,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -48,9 +55,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.AppUpdateInfo
+import com.example.data.AppUpdateService
 import com.example.security.HapticSensitivity
 import com.example.security.HapticsHelper
 import com.example.ui.theme.PixelAccentColor
@@ -76,12 +86,31 @@ fun SettingsScreen(
     onHapticSensitivityChange: (HapticSensitivity) -> Unit = {},
     isOnlineCardArtEnabled: Boolean = false,
     onToggleOnlineCardArt: (Boolean) -> Unit = {},
+    autoCheckUpdates: Boolean = true,
+    onToggleAutoCheckUpdates: (Boolean) -> Unit = {},
+    isCheckingForUpdates: Boolean = false,
+    updateStatusMessage: String? = null,
+    onCheckForUpdates: () -> Unit = {},
+    appUpdateInfo: AppUpdateInfo? = null,
+    onShowUpdateDetails: () -> Unit = {},
     onNavigateBack: () -> Unit,
     haptics: HapticsHelper? = null,
     modifier: Modifier = Modifier
 ) {
     var showPinDialog by remember { mutableStateOf(false) }
-    var pinInput by remember { mutableStateOf(masterPin) }
+
+    if (showPinDialog) {
+        AndroidLockScreenPinSetupScreen(
+            currentPin = masterPin,
+            onPinSaved = { newPin ->
+                onUpdateMasterPin(newPin)
+                showPinDialog = false
+            },
+            onDismiss = { showPinDialog = false },
+            haptics = haptics
+        )
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -416,7 +445,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Display official card designs for HDFC and SBI cards from their official portals.",
+                                text = "Display official card designs for HDFC, SBI, Chase, Amex, Apple Card, and more.",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -432,38 +461,198 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-    }
+            // 5. APP UPDATES & VERSION
+            val context = LocalContext.current
+            Text(
+                text = "App Updates",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 0.5.sp
+            )
 
-    if (showPinDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showPinDialog = false },
-            title = { Text("Change PIN", fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = pinInput,
-                    onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pinInput = it },
-                    singleLine = true,
-                    label = { Text("PIN") }
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (pinInput.length in 4..6) {
-                        onUpdateMasterPin(pinInput)
-                        haptics?.success()
-                        showPinDialog = false
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // Check for Updates action row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(
+                                text = "Check for Updates",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Current version: v${AppUpdateService.CURRENT_VERSION_NAME}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(1.dp))
+                            Text(
+                                text = "github.com/imarinzone/Simple-wallet/releases",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                            )
+                        }
+
+                        ElevatedButton(
+                            onClick = {
+                                haptics?.cardSelect()
+                                onCheckForUpdates()
+                            },
+                            enabled = !isCheckingForUpdates,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.elevatedButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            if (isCheckingForUpdates) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Checking…", fontSize = 13.sp)
+                            } else {
+                                Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Check", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
-                }) {
-                    Text("Save", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPinDialog = false }) {
-                    Text("Cancel")
+
+                    // Status message or update banner
+                    if (updateStatusMessage != null || appUpdateInfo != null) {
+                        val isAvailable = appUpdateInfo?.isUpdateAvailable == true
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isAvailable)
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                    else
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isAvailable)
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                    else
+                                        MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = updateStatusMessage ?: if (isAvailable) "New release v${appUpdateInfo?.latestVersionName} available!" else "You are up to date! (v${appUpdateInfo?.currentVersionName})",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                if (appUpdateInfo != null) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "Installed: v${appUpdateInfo.currentVersionName}",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "Latest: v${appUpdateInfo.latestVersionName}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                if (appUpdateInfo != null && isAvailable) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        ElevatedButton(
+                                            onClick = {
+                                                haptics?.success()
+                                                AppUpdateService.openDownloadPage(context, appUpdateInfo.downloadUrl)
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.elevatedButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Download v${appUpdateInfo.latestVersionName}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                haptics?.cardSelect()
+                                                onShowUpdateDetails()
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.weight(0.7f)
+                                        ) {
+                                            Text("Details", fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // Auto-check updates toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(
+                                text = "Auto Check on Launch",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Notify immediately when an app update is ready",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = autoCheckUpdates,
+                            onCheckedChange = {
+                                haptics?.cardSelect()
+                                onToggleAutoCheckUpdates(it)
+                            }
+                        )
+                    }
                 }
             }
-        )
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 }

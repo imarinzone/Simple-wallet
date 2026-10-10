@@ -82,4 +82,40 @@ class CardArtOnlineServiceTest {
         assertTrue(results.isNotEmpty())
         assertTrue(results.any { it.name.contains("Pixel", ignoreCase = true) })
     }
+
+    @Test
+    fun testSearchCardArt_chaseSapphire() = kotlinx.coroutines.runBlocking {
+        val results = CardArtOnlineService.searchCardArt("chase sapphire")
+        assertTrue("Should find Chase Sapphire cards", results.isNotEmpty())
+        assertTrue(results.all { it.issuer.contains("Chase", ignoreCase = true) })
+    }
+
+    @Test
+    fun testSearchCardArt_amex() = kotlinx.coroutines.runBlocking {
+        val results = CardArtOnlineService.searchCardArt("amex gold")
+        assertTrue("Should find Amex Gold card", results.isNotEmpty())
+        assertEquals("amex_gold", results.first().id)
+    }
+
+    @Test
+    fun testSearchCardArt_categoryFilter() = kotlinx.coroutines.runBlocking {
+        val results = CardArtOnlineService.searchCardArt(category = "Chase")
+        assertTrue(results.isNotEmpty())
+        assertTrue(results.all { it.issuer.contains("Chase", ignoreCase = true) })
+    }
+
+    @Test
+    fun testSuggestArtForCard_chaseSapphire() {
+        val card = CardEntity(
+            title = "Sapphire Preferred",
+            cardholderName = "User",
+            cardNumber = "4000123456789010",
+            expiryDate = "10/30",
+            bankOrIssuer = "Chase",
+            cardType = "VISA"
+        )
+        val suggested = CardArtOnlineService.suggestArtForCard(card)
+        assertNotNull(suggested)
+        assertEquals("chase_sapphire_preferred", suggested?.id)
+    }
 }

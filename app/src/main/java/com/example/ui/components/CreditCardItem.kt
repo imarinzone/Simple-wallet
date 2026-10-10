@@ -117,6 +117,7 @@ fun CreditCardItem(
             .graphicsLayer {
                 rotationY = rotation
                 cameraDistance = 14f * density
+                shadowElevation = 0f
             }
             .background(m3Theme.cardGradient)
             .border(

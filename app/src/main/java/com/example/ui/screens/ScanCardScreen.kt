@@ -201,7 +201,6 @@ fun ScanCardScreen(
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isAnalyzing by remember { mutableStateOf(false) }
     var statusText by remember { mutableStateOf("") }
-    var copiedLabel by remember { mutableStateOf<String?>(null) }
 
     // Card Details State
     var selectedCategoryType by remember { mutableStateOf(CardCategoryType.PAYMENT) }
@@ -222,14 +221,6 @@ fun ScanCardScreen(
     var isSearchingArt by remember { mutableStateOf(false) }
     var showSettingDisabledPrompt by remember { mutableStateOf(false) }
 
-    fun copyToClipboard(label: String, text: String) {
-        if (text.isNotBlank()) {
-            clipboardManager.setText(AnnotatedString(text))
-            haptics?.success()
-            copiedLabel = label
-        }
-    }
-
     var paymentNetwork by remember { mutableStateOf("VISA") }
 
     fun updateNetworkFromPan(pan: String) {
@@ -247,12 +238,13 @@ fun ScanCardScreen(
     // Determine card type string based on selected network or category
     val currentCardType = if (selectedCategoryType == CardCategoryType.PAYMENT) paymentNetwork else selectedCategoryType.name
 
-    fun searchArt() {
+    fun searchArt(customQuery: String? = null) {
+        val q = customQuery ?: artSearchQuery
         isSearchingArt = true
         coroutineScope.launch {
             searchResults = CardArtOnlineService.searchCardArt(
-                query = artSearchQuery.ifBlank { bankOrIssuer.ifBlank { title } },
-                issuer = bankOrIssuer,
+                query = q,
+                issuer = "",
                 cardType = currentCardType
             )
             isSearchingArt = false
@@ -677,90 +669,7 @@ fun ScanCardScreen(
                     haptics = haptics
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Copied notification banner
-                if (copiedLabel != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF34D399).copy(alpha = 0.2f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "✓ $copiedLabel Copied",
-                            color = Color(0xFF34D399),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                // Quick Copy Actions (Scrollable: Copy Number, Copy Name, Copy Expiry, Copy CVV)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (rawCardNumber.isNotBlank()) {
-                        OutlinedButton(
-                            onClick = { copyToClipboard("Card Number", rawCardNumber) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-                        ) {
-                            Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Copy Number", fontSize = 12.sp, maxLines = 1)
-                        }
-                    }
-
-                    if (cardholderName.isNotBlank()) {
-                        OutlinedButton(
-                            onClick = { copyToClipboard("Cardholder Name", cardholderName) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-                        ) {
-                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Copy Name", fontSize = 12.sp, maxLines = 1)
-                        }
-                    }
-
-                    if (rawExpiryDigits.isNotBlank()) {
-                        OutlinedButton(
-                            onClick = {
-                                val exp = if (selectedCategoryType == CardCategoryType.PAYMENT && rawExpiryDigits.length >= 4) {
-                                    "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
-                                } else rawExpiryDigits
-                                copyToClipboard("Expiry", exp)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-                        ) {
-                            Text("Copy Expiry", fontSize = 12.sp, maxLines = 1)
-                        }
-                    }
-
-                    if (cvv.isNotBlank()) {
-                        OutlinedButton(
-                            onClick = { copyToClipboard("CVV Code", cvv) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-                        ) {
-                            Text("Copy CVV", fontSize = 12.sp, maxLines = 1)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // ================= AUTHENTIC WEB CARD ARTWORK SECTION =================
                 Row(
@@ -848,8 +757,11 @@ fun ScanCardScreen(
                         ) {
                             OutlinedTextField(
                                 value = artSearchQuery,
-                                onValueChange = { artSearchQuery = it },
-                                placeholder = { Text("Filter cards (e.g. Millennia, Swiggy, Tata, Shaurya)", fontSize = 12.sp) },
+                                onValueChange = {
+                                    artSearchQuery = it
+                                    searchArt(it)
+                                },
+                                placeholder = { Text("Search cards (e.g. Chase, Sapphire, Millennia, Swiggy, Amex)", fontSize = 12.sp) },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -862,8 +774,17 @@ fun ScanCardScreen(
                                 ),
                                 shape = RoundedCornerShape(12.dp),
                                 trailingIcon = {
-                                    IconButton(onClick = { searchArt() }) {
-                                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                                    if (artSearchQuery.isNotBlank()) {
+                                        IconButton(onClick = {
+                                            artSearchQuery = ""
+                                            searchArt("")
+                                        }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    } else {
+                                        IconButton(onClick = { searchArt() }) {
+                                            Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
+                                        }
                                     }
                                 }
                             )
@@ -1049,18 +970,6 @@ fun ScanCardScreen(
                         keyboardType = if (isPayment) KeyboardType.Number else KeyboardType.Ascii,
                         capitalization = KeyboardCapitalization.Characters
                     ),
-                    trailingIcon = {
-                        if (rawCardNumber.isNotBlank()) {
-                            IconButton(onClick = { copyToClipboard("Card Number", rawCardNumber) }) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy Number",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors,
                     singleLine = true
@@ -1082,18 +991,6 @@ fun ScanCardScreen(
                     },
                     placeholder = { Text("FULL NAME") },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                    trailingIcon = {
-                        if (cardholderName.isNotBlank()) {
-                            IconButton(onClick = { copyToClipboard("Cardholder Name", cardholderName) }) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy Name",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    },
                     modifier = Modifier.fillMaxWidth(),
                     colors = fieldColors,
                     singleLine = true
@@ -1125,23 +1022,6 @@ fun ScanCardScreen(
                         keyboardOptions = KeyboardOptions(
                             keyboardType = if (isPayment) KeyboardType.Number else KeyboardType.Ascii
                         ),
-                        trailingIcon = {
-                            if (rawExpiryDigits.isNotBlank()) {
-                                IconButton(onClick = {
-                                    val exp = if (isPayment && rawExpiryDigits.length >= 4) {
-                                        "${rawExpiryDigits.take(2)}/${rawExpiryDigits.drop(2)}"
-                                    } else rawExpiryDigits
-                                    copyToClipboard("Expiry", exp)
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = "Copy Expiry",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        },
                         modifier = Modifier.weight(if (isPayment) 1.2f else 1f),
                         colors = fieldColors,
                         singleLine = true
@@ -1154,18 +1034,6 @@ fun ScanCardScreen(
                             label = { Text("CVV") },
                             placeholder = { Text("•••") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            trailingIcon = {
-                                if (cvv.isNotBlank()) {
-                                    IconButton(onClick = { copyToClipboard("CVV", cvv) }) {
-                                        Icon(
-                                            imageVector = Icons.Default.ContentCopy,
-                                            contentDescription = "Copy CVV",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            },
                             modifier = Modifier.weight(0.8f),
                             colors = fieldColors,
                             singleLine = true
