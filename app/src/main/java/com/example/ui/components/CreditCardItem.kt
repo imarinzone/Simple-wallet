@@ -134,47 +134,31 @@ fun CreditCardItem(
                 }
             }
     ) {
-        // If an authentic card artwork image is fetched from the web, display it as background
-        if (card.cardArtUrl.isNotBlank()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(card.cardArtUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "${card.title} Artwork",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(18.dp))
-            )
-
-            // Protective contrast gradient so embossed cardholder name & numbers remain perfectly legible
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = 0.35f),
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.65f)
-                            )
-                        )
-                    )
-            )
-        }
-
         if (rotation <= 90f) {
             // FRONT OF CARD
-            CardFrontContent(
-                card = card,
-                m3Theme = m3Theme,
-                onFlipRequest = {
-                    haptics?.cardFlip()
-                    isFlipped = true
-                }
-            )
+            if (card.cardArtUrl.isNotBlank()) {
+                // Clean official card artwork only — no text or numbers overlaid on top
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(card.cardArtUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "${card.title} Artwork",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(18.dp))
+                )
+            } else {
+                CardFrontContent(
+                    card = card,
+                    m3Theme = m3Theme,
+                    onFlipRequest = {
+                        haptics?.cardFlip()
+                        isFlipped = true
+                    }
+                )
+            }
         } else {
             // BACK OF CARD (Mirror fix)
             Box(
