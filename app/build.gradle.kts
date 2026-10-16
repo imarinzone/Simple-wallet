@@ -12,12 +12,31 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  val envVersionCode = providers.environmentVariable("VERSION_CODE")
+    .orElse(providers.environmentVariable("GITHUB_RUN_NUMBER"))
+    .orElse(providers.gradleProperty("versionCode"))
+    .map { it.toIntOrNull() ?: 18 }
+    .getOrElse(18)
+
+  val envVersionName = providers.environmentVariable("VERSION_NAME")
+    .orElse(providers.gradleProperty("versionName"))
+    .orElse(
+      providers.environmentVariable("GITHUB_REF_NAME")
+        .filter { it.startsWith("v") || it.contains(".") }
+        .map { it.removePrefix("v").removePrefix("V") }
+    )
+    .orElse(
+      providers.environmentVariable("GITHUB_RUN_NUMBER")
+        .map { "1.0.$it" }
+    )
+    .getOrElse("1.0.18")
+
   defaultConfig {
     applicationId = "com.aistudio.vaultfolio.kxpzql"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = envVersionCode
+    versionName = envVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

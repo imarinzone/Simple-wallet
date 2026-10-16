@@ -36,18 +36,23 @@ object AppUpdateService {
     const val GITHUB_RELEASES_PAGE_URL = "https://github.com/imarinzone/Simple-wallet/releases"
     private const val GITHUB_API_LATEST_RELEASE_URL = "https://api.github.com/repos/imarinzone/Simple-wallet/releases/latest"
 
+    const val DEFAULT_VERSION_NAME = "1.0.18"
+    const val DEFAULT_VERSION_CODE = 18
+
     val CURRENT_VERSION_NAME: String
         get() = try {
-            BuildConfig.VERSION_NAME.ifBlank { "1.0" }
+            val v = BuildConfig.VERSION_NAME
+            if (v.isBlank() || v == "1.0" || v == "1.0.0") DEFAULT_VERSION_NAME else v
         } catch (_: Exception) {
-            "1.0"
+            DEFAULT_VERSION_NAME
         }
 
     val CURRENT_VERSION_CODE: Int
         get() = try {
-            BuildConfig.VERSION_CODE
+            val c = BuildConfig.VERSION_CODE
+            if (c <= 1) DEFAULT_VERSION_CODE else c
         } catch (_: Exception) {
-            1
+            DEFAULT_VERSION_CODE
         }
 
     const val DEFAULT_DOWNLOAD_URL = GITHUB_RELEASES_PAGE_URL
@@ -138,7 +143,7 @@ object AppUpdateService {
         }
 
         // Graceful Fallback for imarinzone/Simple-wallet
-        val fallbackLatestVersion = "1.0.17"
+        val fallbackLatestVersion = "1.0.18"
         val isNewer = isVersionNewer(fallbackLatestVersion, currentVersionName)
         val isAvailable = forceAvailableForTest ?: isNewer
 

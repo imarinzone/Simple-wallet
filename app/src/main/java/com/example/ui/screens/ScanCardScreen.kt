@@ -57,6 +57,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -66,10 +67,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -381,38 +382,57 @@ fun ScanCardScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Mode Selector Tabs: Camera Scan vs Manual Entry
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+            // Mode Selector: Material 3 SingleChoiceSegmentedButtonRow
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Tab(
+                SegmentedButton(
                     selected = selectedTab == 0,
                     onClick = {
                         haptics?.cardSelect()
                         selectedTab = 0
                     },
-                    text = { Text("Scan Card", fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    icon = {
+                        SegmentedButtonDefaults.Icon(active = selectedTab == 0) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                            )
+                        }
+                    },
+                    label = {
+                        Text(
+                            text = "Scan Card",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
                 )
-                Tab(
+                SegmentedButton(
                     selected = selectedTab == 1,
                     onClick = {
                         haptics?.cardSelect()
                         selectedTab = 1
                     },
-                    text = { Text("Manual Entry", fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    icon = {
+                        SegmentedButtonDefaults.Icon(active = selectedTab == 1) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                            )
+                        }
+                    },
+                    label = {
+                        Text(
+                            text = "Manual Entry",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
                 )
             }
 
@@ -421,13 +441,16 @@ fun ScanCardScreen(
             // TAB 0: Camera Scan Area
             if (selectedTab == 0) {
                 if (capturedBitmap == null) {
-                    Box(
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(420.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color.Black)
-                            .border(1.dp, Color(0xFFE5A93C).copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                            .height(420.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.Black,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                        )
                     ) {
                         CameraXCardScannerView(
                             onCardImageCaptured = { bitmap ->
@@ -443,7 +466,7 @@ fun ScanCardScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = {
                             haptics?.cardSelect()
                             photoPickerLauncher.launch(
@@ -452,48 +475,56 @@ fun ScanCardScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(46.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                            .height(48.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     ) {
                         Icon(imageVector = Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Choose from Photos", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Choose from Photos", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                     }
                 } else {
                     // Captured image preview
-                    Box(
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF1E1A17))
-                            .border(1.dp, Color(0xFFE5A93C).copy(alpha = 0.5f), RoundedCornerShape(18.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            bitmap = capturedBitmap!!.asImageBitmap(),
-                            contentDescription = "Card Photo",
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp))
+                            .height(200.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         )
-
-                        if (isAnalyzing) {
-                            Box(
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Image(
+                                bitmap = capturedBitmap!!.asImageBitmap(),
+                                contentDescription = "Card Photo",
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.75f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(color = Color(0xFFE5A93C))
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = "Scanning card...",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp
-                                    )
+                                    .clip(RoundedCornerShape(20.dp))
+                            )
+
+                            if (isAnalyzing) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = "Scanning card...",
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -508,9 +539,9 @@ fun ScanCardScreen(
                             statusText = ""
                         }
                     ) {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Retake", tint = Color(0xFFE5A93C), modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Retake", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Retake Photo", color = Color(0xFFE5A93C), fontWeight = FontWeight.Bold)
+                        Text("Retake Photo", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -518,8 +549,8 @@ fun ScanCardScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = statusText,
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }

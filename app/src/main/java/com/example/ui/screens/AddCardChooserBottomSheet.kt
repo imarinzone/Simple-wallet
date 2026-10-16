@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,29 +13,30 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.security.HapticsHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,9 +54,9 @@ fun AddCardChooserBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 10.dp,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        shape = MaterialTheme.shapes.extraLarge
     ) {
         Column(
             modifier = modifier
@@ -71,29 +71,42 @@ fun AddCardChooserBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Add Card",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = "Add Card to Wallet",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        text = "Choose how you would like to add your card",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
-                IconButton(onClick = onDismiss) {
+                FilledTonalIconButton(
+                    onClick = onDismiss,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        contentDescription = "Close"
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Option 1: Camera Scan
             ScanMethodItem(
                 title = "Camera Scan",
+                subtitle = "Instant AI & OCR recognition from card photo",
                 icon = Icons.Default.CameraAlt,
-                accentColor = MaterialTheme.colorScheme.primary,
+                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
                 onClick = {
                     haptics?.cardSelect()
                     onDismiss()
@@ -106,8 +119,10 @@ fun AddCardChooserBottomSheet(
             // Option 2: NFC Tap
             ScanMethodItem(
                 title = "NFC Tap",
+                subtitle = "Hold contactless card to the back of your phone",
                 icon = Icons.Default.Sensors,
-                accentColor = Color(0xFF38BDF8),
+                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
                 onClick = {
                     haptics?.cardSelect()
                     onDismiss()
@@ -120,8 +135,10 @@ fun AddCardChooserBottomSheet(
             // Option 3: Manual Entry
             ScanMethodItem(
                 title = "Manual Entry",
+                subtitle = "Type card details and choose official card art",
                 icon = Icons.Default.Edit,
-                accentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
                 onClick = {
                     haptics?.cardSelect()
                     onDismiss()
@@ -135,47 +152,58 @@ fun AddCardChooserBottomSheet(
 @Composable
 private fun ScanMethodItem(
     title: String,
+    subtitle: String,
     icon: ImageVector,
-    accentColor: Color,
+    iconContainerColor: Color,
+    iconTint: Color,
     onClick: () -> Unit
 ) {
-    Box(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .clickable { onClick() },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(accentColor.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(46.dp),
+                shape = CircleShape,
+                color = iconContainerColor
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = accentColor,
-                    modifier = Modifier.size(22.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = iconTint,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            Text(
-                text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             Icon(
                 imageVector = Icons.Default.ChevronRight,

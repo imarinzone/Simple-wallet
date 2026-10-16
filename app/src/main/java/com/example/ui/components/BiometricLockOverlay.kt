@@ -1,11 +1,11 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,17 +22,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Pin
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,12 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.security.HapticsHelper
+import com.example.ui.theme.PlusJakartaSansFamily
 
 @Composable
 fun BiometricLockOverlay(
@@ -144,7 +143,7 @@ fun BiometricLockOverlay(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(130.dp)
+                        .size(136.dp)
                         .clickable {
                             haptics?.cardSelect()
                             onTriggerSystemBiometric()
@@ -156,24 +155,24 @@ fun BiometricLockOverlay(
                             .size(120.dp)
                             .scale(pulseScale)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
                     )
 
                     // Biometric Sensor Button
-                    Box(
-                        modifier = Modifier
-                            .size(90.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(2.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        modifier = Modifier.size(92.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        border = BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Fingerprint,
-                            contentDescription = "Fingerprint Sensor",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(52.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Fingerprint,
+                                contentDescription = "Fingerprint Sensor",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(52.dp)
+                            )
+                        }
                     }
                 }
 
@@ -182,8 +181,7 @@ fun BiometricLockOverlay(
                 Text(
                     text = "VaultFolio Locked",
                     color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.headlineSmall
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -191,40 +189,36 @@ fun BiometricLockOverlay(
                 Text(
                     text = "Touch the fingerprint sensor to unlock",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp
+                    style = MaterialTheme.typography.bodyMedium
                 )
 
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = errorMessage ?: "",
-                        color = Color(0xFFEF4444),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
 
                 Spacer(modifier = Modifier.height(40.dp))
 
-                // Outlined button to enter PIN instead
-                OutlinedButton(
+                // FilledTonalButton to enter PIN instead
+                FilledTonalButton(
                     onClick = {
                         haptics?.cardSelect()
                         isPinMode = true
                         errorMessage = null
                         enteredPin = ""
                     },
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.large,
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
-                        .height(50.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
+                        .height(52.dp)
                 ) {
                     Icon(imageVector = Icons.Default.Pin, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Enter PIN Instead", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text("Enter PIN Instead", style = MaterialTheme.typography.labelLarge)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -232,19 +226,19 @@ fun BiometricLockOverlay(
                 // ================= MODE 2: NUMERIC PIN INPUT =================
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    modifier = Modifier.size(56.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -252,8 +246,7 @@ fun BiometricLockOverlay(
                 Text(
                     text = if (masterPin.isBlank()) "Create 4-Digit Master PIN" else "Enter Master PIN",
                     color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -261,7 +254,7 @@ fun BiometricLockOverlay(
                 Text(
                     text = if (masterPin.isBlank()) "No PIN was set yet. Enter 4 digits to create your PIN and unlock." else "Enter your 4-digit security code",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp
+                    style = MaterialTheme.typography.bodySmall
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -279,12 +272,12 @@ fun BiometricLockOverlay(
                                 .clip(CircleShape)
                                 .background(
                                     if (filled) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                    else MaterialTheme.colorScheme.surfaceContainerHighest
                                 )
                                 .border(
                                     1.dp,
                                     if (filled) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                    else MaterialTheme.colorScheme.outlineVariant,
                                     CircleShape
                                 )
                         )
@@ -294,9 +287,8 @@ fun BiometricLockOverlay(
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage ?: "",
-                        color = Color(0xFFEF4444),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(top = 10.dp)
                     )
                 } else {
@@ -322,60 +314,66 @@ fun BiometricLockOverlay(
                             for (item in row) {
                                 when (item) {
                                     "BIO" -> {
-                                        Box(
+                                        Surface(
                                             modifier = Modifier
                                                 .size(64.dp)
                                                 .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                                                 .clickable {
                                                     haptics?.cardSelect()
                                                     isPinMode = false
                                                     onTriggerSystemBiometric()
                                                 },
-                                            contentAlignment = Alignment.Center
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primaryContainer
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Fingerprint,
-                                                contentDescription = "Switch to Fingerprint",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(28.dp)
-                                            )
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Fingerprint,
+                                                    contentDescription = "Switch to Fingerprint",
+                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    modifier = Modifier.size(28.dp)
+                                                )
+                                            }
                                         }
                                     }
                                     "DEL" -> {
-                                        Box(
+                                        Surface(
                                             modifier = Modifier
                                                 .size(64.dp)
                                                 .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                                                 .clickable { onBackspace() },
-                                            contentAlignment = Alignment.Center
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.secondaryContainer
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                                contentDescription = "Backspace",
-                                                tint = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(22.dp)
-                                            )
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                                    contentDescription = "Backspace",
+                                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                    modifier = Modifier.size(22.dp)
+                                                )
+                                            }
                                         }
                                     }
                                     else -> {
-                                        Box(
+                                        Surface(
                                             modifier = Modifier
                                                 .size(64.dp)
                                                 .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), CircleShape)
                                                 .clickable { onNumberPress(item) },
-                                            contentAlignment = Alignment.Center
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                                         ) {
-                                            Text(
-                                                text = item,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                fontSize = 22.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontFamily = FontFamily.SansSerif
-                                            )
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = item,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    fontSize = 22.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontFamily = PlusJakartaSansFamily
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -392,11 +390,11 @@ fun BiometricLockOverlay(
                         haptics?.cardSelect()
                         isPinMode = false
                     },
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Icon(imageVector = Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Use Fingerprint", fontSize = 13.sp)
+                    Text("Use Fingerprint", style = MaterialTheme.typography.labelLarge)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
