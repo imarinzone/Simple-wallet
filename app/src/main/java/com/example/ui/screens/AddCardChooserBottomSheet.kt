@@ -44,10 +44,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -55,67 +53,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.security.HapticsHelper
-import kotlin.math.PI
-import kotlin.math.cos
-
-/**
- * Builds the scalloped/ridged top contour path for the "Add Card to Wallet" tab
- * so that its top edge has organic sinusoidal ridges matching the Google Pixel Clock
- * scalloped border of the '+' button.
- */
-fun createRidgedTabTopPath(
-    width: Float,
-    height: Float,
-    topInsetY: Float,
-    ridgeAmplitude: Float,
-    ridgeCount: Int = 12
-): Path {
-    val path = Path()
-    val steps = 240
-    path.moveTo(0f, height)
-    path.lineTo(0f, topInsetY + ridgeAmplitude)
-
-    for (i in 0..steps) {
-        val t = i.toFloat() / steps.toFloat()
-        val x = t * width
-        // Smoothly taper ridge amplitude near the left/right edges for clean rounded corners
-        val edgeEnvelope = kotlin.math.sin(PI * t).toFloat()
-        val wave = 0.5f - 0.5f * cos(ridgeCount * 2.0 * PI * t).toFloat()
-        val y = topInsetY + (ridgeAmplitude * wave * edgeEnvelope)
-        path.lineTo(x, y)
-    }
-
-    path.lineTo(width, height)
-    path.close()
-    return path
-}
-
-/**
- * Builds the open stroke path along the ridged top edge of the "Add Card to Wallet" tab
- * so it shares the exact primary ridge stroke style as the expanding '+' sign.
- */
-fun createRidgedTabTopStrokePath(
-    width: Float,
-    topInsetY: Float,
-    ridgeAmplitude: Float,
-    ridgeCount: Int = 12
-): Path {
-    val path = Path()
-    val steps = 240
-    for (i in 0..steps) {
-        val t = i.toFloat() / steps.toFloat()
-        val x = t * width
-        val edgeEnvelope = kotlin.math.sin(PI * t).toFloat()
-        val wave = 0.5f - 0.5f * cos(ridgeCount * 2.0 * PI * t).toFloat()
-        val y = topInsetY + (ridgeAmplitude * wave * edgeEnvelope)
-        if (i == 0) {
-            path.moveTo(x, y)
-        } else {
-            path.lineTo(x, y)
-        }
-    }
-    return path
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -146,102 +83,64 @@ fun AddCardChooserBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.Transparent,
-        dragHandle = null
+        containerColor = sheetSurfaceColor,
+        dragHandle = null,
+        shape = MaterialTheme.shapes.extraLarge
     ) {
-        Box(
+        Column(
             modifier = modifier
                 .fillMaxWidth()
-                .drawBehind {
-                    val topInsetPx = 56.dp.toPx()
-                    val ridgeAmpPx = 10.dp.toPx()
-                    val fillPath = createRidgedTabTopPath(
-                        width = size.width,
-                        height = size.height,
-                        topInsetY = topInsetPx,
-                        ridgeAmplitude = ridgeAmpPx,
-                        ridgeCount = 12
-                    )
-                    drawPath(
-                        path = fillPath,
-                        color = sheetSurfaceColor,
-                        style = Fill
-                    )
-
-                    val strokePath = createRidgedTabTopStrokePath(
-                        width = size.width,
-                        topInsetY = topInsetPx,
-                        ridgeAmplitude = ridgeAmpPx,
-                        ridgeCount = 12
-                    )
-                    drawPath(
-                        path = strokePath,
-                        color = primaryColor.copy(alpha = 0.85f),
-                        style = Stroke(width = 2.4.dp.toPx())
-                    )
-                }
+                .padding(horizontal = 20.dp)
+                .padding(top = 20.dp, bottom = 32.dp)
+                .navigationBarsPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Enlarged Scalloped/Ridged '+' Sign overlapping the top of the Ridged Add Card Tab
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .size(116.dp)
-                    .clickable { onDismiss() },
-                contentAlignment = Alignment.Center
+            // Header Row with Scalloped '+' Badge (no horizontal bar line)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val w = size.width
-                    val h = size.height
-                    val cx = w / 2f
-                    val cy = h / 2f
-
-                    rotate(idleClockRotation, pivot = Offset(cx, cy)) {
-                        val clockPath = createGoogleClockBorderPath(
-                            width = w,
-                            height = h,
-                            lobes = 8,
-                            lobeDepthRatio = 0.15f
-                        )
-                        // Filled interior matching the tab surface so the plus sign and tab fuse seamlessly
-                        drawPath(
-                            path = clockPath,
-                            color = sheetSurfaceColor,
-                            style = Fill
-                        )
-                        // Ridged primary border matching the tab's top ridge stroke
-                        drawPath(
-                            path = clockPath,
-                            color = primaryColor.copy(alpha = 0.9f),
-                            style = Stroke(width = 2.6.dp.toPx())
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier.size(44.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val w = size.width
+                            val h = size.height
+                            rotate(idleClockRotation, pivot = Offset(w / 2f, h / 2f)) {
+                                val clockPath = createGoogleClockBorderPath(
+                                    width = w,
+                                    height = h,
+                                    lobes = 8,
+                                    lobeDepthRatio = 0.15f
+                                )
+                                drawPath(
+                                    path = clockPath,
+                                    color = primaryColor.copy(alpha = 0.14f),
+                                    style = Fill
+                                )
+                                drawPath(
+                                    path = clockPath,
+                                    color = primaryColor.copy(alpha = 0.9f),
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                }
 
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Card",
-                    tint = primaryColor,
-                    modifier = Modifier.size(52.dp)
-                )
-            }
-
-            // Tab Content positioned below the overlapping enlarged '+' crest
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 112.dp)
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 32.dp)
-                    .navigationBarsPadding(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Header Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column {
                         Text(
                             text = "Add Card to Wallet",
                             color = MaterialTheme.colorScheme.onSurface,
@@ -255,69 +154,69 @@ fun AddCardChooserBottomSheet(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-
-                    FilledTonalIconButton(
-                        onClick = onDismiss,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close"
-                        )
-                    }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Option 1: Camera Scan
-                ScanMethodItem(
-                    title = "Camera Scan",
-                    subtitle = "Instant AI & OCR recognition from card photo",
-                    icon = Icons.Default.CameraAlt,
-                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    onClick = {
-                        haptics?.cardSelect()
-                        onDismiss()
-                        onChooseCameraScan()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Option 2: NFC Tap
-                ScanMethodItem(
-                    title = "NFC Tap",
-                    subtitle = "Hold contactless card to the back of your phone",
-                    icon = Icons.Default.Sensors,
-                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    onClick = {
-                        haptics?.cardSelect()
-                        onDismiss()
-                        onChooseNfcScan()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Option 3: Manual Entry
-                ScanMethodItem(
-                    title = "Manual Entry",
-                    subtitle = "Type card details and choose official card art",
-                    icon = Icons.Default.Edit,
-                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    onClick = {
-                        haptics?.cardSelect()
-                        onDismiss()
-                        onChooseManualEntry()
-                    }
-                )
+                FilledTonalIconButton(
+                    onClick = onDismiss,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close"
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Option 1: Camera Scan
+            ScanMethodItem(
+                title = "Camera Scan",
+                subtitle = "Instant AI & OCR recognition from card photo",
+                icon = Icons.Default.CameraAlt,
+                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = {
+                    haptics?.cardSelect()
+                    onDismiss()
+                    onChooseCameraScan()
+                }
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Option 2: NFC Tap
+            ScanMethodItem(
+                title = "NFC Tap",
+                subtitle = "Hold contactless card to the back of your phone",
+                icon = Icons.Default.Sensors,
+                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = {
+                    haptics?.cardSelect()
+                    onDismiss()
+                    onChooseNfcScan()
+                }
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Option 3: Manual Entry
+            ScanMethodItem(
+                title = "Manual Entry",
+                subtitle = "Type card details and choose official card art",
+                icon = Icons.Default.Edit,
+                iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                onClick = {
+                    haptics?.cardSelect()
+                    onDismiss()
+                    onChooseManualEntry()
+                }
+            )
         }
     }
 }

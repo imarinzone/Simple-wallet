@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,6 +47,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contactless
 import androidx.compose.material.icons.filled.ContentCopy
@@ -59,6 +62,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -98,6 +102,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -183,10 +188,23 @@ class TeardropCameraNotchShape : Shape {
  * Material You Clock Widget, with 8 smooth organic lobes.
  */
 fun createGoogleClockBorderPath(width: Float, height: Float, lobes: Int = 8, lobeDepthRatio: Float = 0.15f): Path {
-    val path = Path()
     val cx = width / 2f
     val cy = height / 2f
     val baseR = min(cx, cy) * 0.90f
+    return createCenteredGoogleClockPath(cx = cx, cy = cy, baseR = baseR, lobes = lobes, lobeDepthRatio = lobeDepthRatio)
+}
+
+/**
+ * Creates the scalloped Google Pixel Clock path centered at arbitrary (cx, cy) with given outer radius [baseR].
+ */
+fun createCenteredGoogleClockPath(
+    cx: Float,
+    cy: Float,
+    baseR: Float,
+    lobes: Int = 8,
+    lobeDepthRatio: Float = 0.15f
+): Path {
+    val path = Path()
     val steps = 180
     val stepAngle = (2.0 * PI) / steps
 
@@ -218,6 +236,9 @@ fun createGoogleClockBorderPath(width: Float, height: Float, lobes: Int = 8, lob
 fun WalletHomeScreen(
     cards: List<CardEntity>,
     onAddNewCard: () -> Unit,
+    onChooseCameraScan: () -> Unit = onAddNewCard,
+    onChooseNfcScan: () -> Unit = onAddNewCard,
+    onChooseManualEntry: () -> Unit = onAddNewCard,
     onNavigateToSettings: () -> Unit,
     onNavigateToSync: () -> Unit,
     onLockWallet: () -> Unit,
@@ -245,17 +266,30 @@ fun WalletHomeScreen(
 
     val isCardSelected = selectedCardId != null && cards.any { it.id == selectedCardId }
 
+    val maxAddDragOffset = 260f
     val addCardDragOffset = remember { Animatable(0f) }
     var lastAddCardHapticMilestone by remember { mutableFloatStateOf(0f) }
 
-    // Hardware back navigation handler: deselects card when detailed view is open
-    BackHandler(enabled = isCardSelected) {
-        haptics?.stackCollapse()
-        selectedCardId = null
+    val isAddMenuOpen = addCardDragOffset.value > 20f
+
+    // Hardware back navigation handler: collapses merged Add Card plus sign or deselects card
+    BackHandler(enabled = isAddMenuOpen || isCardSelected) {
+        if (isAddMenuOpen) {
+            haptics?.stackCollapse()
+            coroutineScope.launch {
+                addCardDragOffset.animateTo(
+                    0f,
+                    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                )
+            }
+        } else {
+            haptics?.stackCollapse()
+            selectedCardId = null
+        }
     }
 
-    // Bottom add button and swipe-up-to-add gesture only active when no card is selected for detailed view
-    val isPlusSignOn = !isOverlayOpen && !isCardSelected && cardToDelete == null
+    // Keep the half-visible plus sign always present on the home screen
+    val isPlusSignOn = !isOverlayOpen && cardToDelete == null
 
     Box(
         modifier = modifier
@@ -267,7 +301,8 @@ fun WalletHomeScreen(
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     var totalDragY = 0f
                     var totalDragX = 0f
-                    var isDraggingUp = false
+                    var isDraggingVertical = false
+                    val startedWhileOpen = addCardDragOffset.value > 130f
 
                     while (true) {
                         val event = awaitPointerEvent(pass = PointerEventPass.Initial)
@@ -278,41 +313,45 @@ fun WalletHomeScreen(
                         totalDragY += delta.y
                         totalDragX += delta.x
 
-                        // Drag from down to up anywhere on the home screen when no card is selected
-                        if (!isDraggingUp && totalDragY < -10f && abs(totalDragY) > abs(totalDragX) * 1.1f) {
-                            isDraggingUp = true
+                        // Allow dragging up to expand the plus sign, or dragging down when expanded to collapse it
+                        if (!isDraggingVertical && abs(totalDragY) > 10f && abs(totalDragY) > abs(totalDragX) * 1.1f) {
+                            if ((!startedWhileOpen && totalDragY < 0f) || (startedWhileOpen && totalDragY > 0f)) {
+                                isDraggingVertical = true
+                            }
                         }
 
-                        if (isDraggingUp) {
+                        if (isDraggingVertical) {
                             change.consume()
-                            val nextPull = (addCardDragOffset.value - delta.y * 1.15f).coerceIn(0f, 260f)
+                            val nextPull = (addCardDragOffset.value - delta.y * 1.15f).coerceIn(0f, maxAddDragOffset)
                             coroutineScope.launch {
                                 addCardDragOffset.snapTo(nextPull)
                             }
-                            if (nextPull - lastAddCardHapticMilestone >= 16f) {
+                            if (abs(nextPull - lastAddCardHapticMilestone) >= 18f) {
                                 haptics?.cardDragTick()
                                 lastAddCardHapticMilestone = nextPull
                             }
                         }
                     }
 
-                    if (isDraggingUp) {
+                    if (isDraggingVertical) {
                         val currentPull = addCardDragOffset.value
-                        if (currentPull >= 50f) {
+                        val expandThreshold = if (startedWhileOpen) 180f else 75f
+                        if (currentPull >= expandThreshold) {
+                            // Settle at half-screen expanded state with the Add Card screen merged inside!
                             haptics?.cardDraw()
                             coroutineScope.launch {
                                 addCardDragOffset.animateTo(
-                                    240f,
-                                    spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                                    maxAddDragOffset,
+                                    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
                                 )
-                                onAddNewCard()
-                                addCardDragOffset.snapTo(0f)
                             }
                         } else {
+                            // Collapse back to the bottom '+' button
+                            haptics?.stackCollapse()
                             coroutineScope.launch {
                                 addCardDragOffset.animateTo(
                                     0f,
-                                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                                    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
                                 )
                             }
                         }
@@ -510,7 +549,15 @@ fun WalletHomeScreen(
                                 )
                                 Spacer(modifier = Modifier.height(24.dp))
                                 FilledTonalButton(
-                                    onClick = onAddNewCard,
+                                    onClick = {
+                                        haptics?.cardDraw()
+                                        coroutineScope.launch {
+                                            addCardDragOffset.animateTo(
+                                                maxAddDragOffset,
+                                                spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                                            )
+                                        }
+                                    },
                                     shape = MaterialTheme.shapes.large
                                 ) {
                                     Icon(
@@ -540,158 +587,239 @@ fun WalletHomeScreen(
                     )
                 }
             }
+        }
 
-            // ================= 3. BOTTOM ADD BUTTON (ONLY SHOWN WHEN NO CARD IS SELECTED) =================
-            if (isPlusSignOn) {
-                val pullFraction = (addCardDragOffset.value / 200f).coerceIn(0f, 1f)
-                val primaryColor = MaterialTheme.colorScheme.primary
-                val sheetSurfaceColor = MaterialTheme.colorScheme.surfaceContainerLow
-                val density = LocalDensity.current
+        // ================= 3. HALF-SCREEN EXPANDING PLUS SIGN WITH MERGED ADD CARD SCREEN =================
+        if (isPlusSignOn) {
+            val pullFraction = (addCardDragOffset.value / maxAddDragOffset).coerceIn(0f, 1f)
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val sheetSurfaceColor = MaterialTheme.colorScheme.surfaceContainerLow
 
-                val infiniteTransition = rememberInfiniteTransition(label = "GoogleClockBorderTransition")
-                val idleClockRotation by infiniteTransition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 16000, easing = LinearEasing),
-                        repeatMode = RepeatMode.Restart
-                    ),
-                    label = "idleClockRotation"
-                )
+            val infiniteTransition = rememberInfiniteTransition(label = "GoogleClockBorderTransition")
+            val idleClockRotation by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 16000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "idleClockRotation"
+            )
 
-                val currentRotation = idleClockRotation + (addCardDragOffset.value * 1.5f)
-                val halfCoverOffsetPx = with(density) { 34.dp.toPx() }
-                val currentYOffset = (halfCoverOffsetPx - (addCardDragOffset.value * 1.45f)).roundToInt()
+            val currentRotation = idleClockRotation + (addCardDragOffset.value * 0.6f)
 
-                // Plus sign smoothly grows bigger as dragged from bottom to up (64.dp -> 116.dp)
-                val currentPlusBoxSize = 64.dp + (52.dp * pullFraction)
-                val currentIconSize = 30.dp + (22.dp * pullFraction)
-                val emergingTabHeight = (pullFraction * 320f).dp
+            // Fading animations: '+' cross fades out as the Add Card text & options fade in inside the half-screen plus sign
+            val plusCrossAlpha = (1f - (pullFraction / 0.45f)).coerceIn(0f, 1f)
+            val addCardTextAlpha = ((pullFraction - 0.25f) / 0.75f).coerceIn(0f, 1f)
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding(),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    // Emerging ridged "Add Card to Wallet" tab rising directly underneath & overlapped by the growing '+' sign
-                    if (pullFraction > 0.02f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(emergingTabHeight)
-                        ) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val topInsetPx = 14.dp.toPx()
-                                val ridgeAmpPx = 10.dp.toPx()
-                                val fillPath = createRidgedTabTopPath(
-                                    width = size.width,
-                                    height = size.height,
-                                    topInsetY = topInsetPx,
-                                    ridgeAmplitude = ridgeAmpPx,
-                                    ridgeCount = 12
-                                )
-                                drawPath(
-                                    path = fillPath,
-                                    color = sheetSurfaceColor.copy(alpha = (pullFraction * 1.2f).coerceIn(0f, 1f)),
-                                    style = Fill
-                                )
-
-                                val strokePath = createRidgedTabTopStrokePath(
-                                    width = size.width,
-                                    topInsetY = topInsetPx,
-                                    ridgeAmplitude = ridgeAmpPx,
-                                    ridgeCount = 12
-                                )
-                                drawPath(
-                                    path = strokePath,
-                                    color = primaryColor.copy(alpha = (pullFraction * 0.9f).coerceIn(0f, 0.85f)),
-                                    style = Stroke(width = 2.4.dp.toPx())
-                                )
-                            }
-
-                            if (pullFraction > 0.35f) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 68.dp, start = 24.dp, end = 24.dp)
-                                        .graphicsLayer {
-                                            alpha = ((pullFraction - 0.35f) / 0.65f).coerceIn(0f, 1f)
-                                        },
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "Add Card to Wallet",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = if (pullFraction >= 0.3f) "Release to choose scan method" else "Drag up to open",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Expanding Scalloped/Ridged '+' Sign overlapping the rising ridged tab
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding(),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                // Tap-outside area in the upper half of the screen to collapse the expanded plus sign
+                if (pullFraction > 0.6f) {
                     Box(
                         modifier = Modifier
-                            .offset { IntOffset(0, currentYOffset) }
-                            .size(currentPlusBoxSize + 4.dp)
+                            .fillMaxSize()
                             .clickable {
-                                haptics?.cardDraw()
+                                haptics?.stackCollapse()
                                 coroutineScope.launch {
                                     addCardDragOffset.animateTo(
-                                        200f,
-                                        spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
-                                    )
-                                    onAddNewCard()
-                                    addCardDragOffset.snapTo(0f)
-                                }
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier.size(currentPlusBoxSize),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val w = size.width
-                                val h = size.height
-                                val cx = w / 2f
-                                val cy = h / 2f
-
-                                rotate(currentRotation, pivot = Offset(cx, cy)) {
-                                    val clockPath = createGoogleClockBorderPath(w, h, lobes = 8, lobeDepthRatio = 0.15f)
-
-                                    if (pullFraction > 0.02f) {
-                                        drawPath(
-                                            path = clockPath,
-                                            color = sheetSurfaceColor.copy(alpha = (pullFraction * 1.25f).coerceIn(0f, 1f)),
-                                            style = Fill
-                                        )
-                                    }
-
-                                    drawPath(
-                                        path = clockPath,
-                                        color = primaryColor.copy(alpha = 0.88f),
-                                        style = Stroke(width = (2.2f + pullFraction * 0.4f).dp.toPx())
+                                        0f,
+                                        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
                                     )
                                 }
                             }
+                    )
+                }
 
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Card",
-                                tint = primaryColor,
-                                modifier = Modifier.size(currentIconSize)
+                // Canvas drawing the scalloped plus sign: half-visible at the bottom when at rest, expanding ONLY till half screen
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val minRadius = 32.dp.toPx()
+                    val maxRadius = maxOf(size.width * 0.72f, size.height * 0.48f)
+                    val currentRadius = minRadius + (maxRadius - minRadius) * pullFraction
+
+                    // At pullFraction = 0f, startCy = size.height so the plus sign is centered right on the bottom edge (top half visible)
+                    // At pullFraction = 1f, the top edge of the scalloped plus sign lands right at half screen (0.45 * height)
+                    val startCy = size.height
+                    val targetCy = (size.height * 0.45f) + (maxRadius * 0.92f)
+                    val cy = startCy + (targetCy - startCy) * pullFraction
+
+                    rotate(currentRotation, pivot = Offset(cx, cy)) {
+                        val clockPath = createCenteredGoogleClockPath(
+                            cx = cx,
+                            cy = cy,
+                            baseR = currentRadius,
+                            lobes = 8,
+                            lobeDepthRatio = 0.14f
+                        )
+
+                        drawPath(
+                            path = clockPath,
+                            color = sheetSurfaceColor.copy(alpha = (0.92f + pullFraction * 0.07f).coerceIn(0f, 0.99f)),
+                            style = Fill
+                        )
+
+                        drawPath(
+                            path = clockPath,
+                            color = primaryColor.copy(alpha = 0.90f),
+                            style = Stroke(width = (2.4f + pullFraction * 1.4f).dp.toPx())
+                        )
+                    }
+
+                    // Central '+' cross positioned so its top half and horizontal bar are clearly visible at the bottom edge
+                    if (plusCrossAlpha > 0.01f) {
+                        val plusCy = cy - (3.dp.toPx() * (1f - pullFraction))
+                        val plusHalfArm = 11.dp.toPx() + (32.dp.toPx() * pullFraction)
+                        val plusStrokeWidth = 2.8.dp.toPx() + (4.dp.toPx() * pullFraction)
+
+                        drawLine(
+                            color = primaryColor.copy(alpha = plusCrossAlpha),
+                            start = Offset(cx - plusHalfArm, plusCy),
+                            end = Offset(cx + plusHalfArm, plusCy),
+                            strokeWidth = plusStrokeWidth,
+                            cap = StrokeCap.Round
+                        )
+                        drawLine(
+                            color = primaryColor.copy(alpha = plusCrossAlpha),
+                            start = Offset(cx, plusCy - plusHalfArm),
+                            end = Offset(cx, plusCy + plusHalfArm),
+                            strokeWidth = plusStrokeWidth,
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
+
+                // Merged Add Card Screen inside the half-screen plus sign with smooth fading animation
+                if (addCardTextAlpha > 0.01f) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.48f)
+                            .graphicsLayer {
+                                alpha = addCardTextAlpha
+                                translationY = (1f - addCardTextAlpha) * 28f
+                            }
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 18.dp, bottom = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Header Row inside the half-screen plus sign
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Add Card to Wallet",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Choose how you would like to add your card",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+
+                            FilledTonalIconButton(
+                                onClick = {
+                                    haptics?.stackCollapse()
+                                    coroutineScope.launch {
+                                        addCardDragOffset.animateTo(
+                                            0f,
+                                            spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                                        )
+                                    }
+                                },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close"
+                                )
+                            }
+                        }
+
+                        // Merged Scan Options inside the half-screen plus sign
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            MergedAddCardOptionItem(
+                                title = "Camera Scan",
+                                subtitle = "Instant AI & OCR recognition from card photo",
+                                icon = Icons.Default.CameraAlt,
+                                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                enabled = pullFraction > 0.7f,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        addCardDragOffset.snapTo(0f)
+                                        onChooseCameraScan()
+                                    }
+                                }
+                            )
+
+                            MergedAddCardOptionItem(
+                                title = "NFC Tap",
+                                subtitle = "Hold contactless card to the back of your phone",
+                                icon = Icons.Default.Sensors,
+                                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                enabled = pullFraction > 0.7f,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        addCardDragOffset.snapTo(0f)
+                                        onChooseNfcScan()
+                                    }
+                                }
+                            )
+
+                            MergedAddCardOptionItem(
+                                title = "Manual Entry",
+                                subtitle = "Type card details and choose official card art",
+                                icon = Icons.Default.Edit,
+                                iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                enabled = pullFraction > 0.7f,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        addCardDragOffset.snapTo(0f)
+                                        onChooseManualEntry()
+                                    }
+                                }
                             )
                         }
                     }
+                }
+
+                // Bottom touch target over the half-visible '+' button when collapsed
+                if (pullFraction < 0.2f) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 76.dp, height = 44.dp)
+                            .clickable {
+                                haptics?.cardDraw()
+                                selectedCardId = null
+                                coroutineScope.launch {
+                                    addCardDragOffset.animateTo(
+                                        maxAddDragOffset,
+                                        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                                    )
+                                }
+                            }
+                    )
                 }
             }
         }
@@ -1260,3 +1388,72 @@ private fun VerticalStackedCardsView(
         Spacer(modifier = Modifier.height(28.dp))
     }
 }
+
+@Composable
+private fun MergedAddCardOptionItem(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    iconContainerColor: Color,
+    iconTint: Color,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onClick() },
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = CircleShape,
+                color = iconContainerColor
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = iconTint,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+

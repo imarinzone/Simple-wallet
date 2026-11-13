@@ -237,7 +237,22 @@ fun MainAppContent(
                         cards = cards,
                         onAddNewCard = {
                             haptics?.cardSelect()
-                            showAddCardChooser = true
+                            startInManualMode = false
+                            viewModel.navigateTo(AppScreen.SCAN_CAMERA)
+                        },
+                        onChooseCameraScan = {
+                            haptics?.cardSelect()
+                            startInManualMode = false
+                            viewModel.navigateTo(AppScreen.SCAN_CAMERA)
+                        },
+                        onChooseNfcScan = {
+                            haptics?.cardSelect()
+                            viewModel.navigateTo(AppScreen.SCAN_NFC)
+                        },
+                        onChooseManualEntry = {
+                            haptics?.cardSelect()
+                            startInManualMode = true
+                            viewModel.navigateTo(AppScreen.SCAN_CAMERA)
                         },
                         onNavigateToSettings = {
                             viewModel.navigateTo(AppScreen.SETTINGS)
@@ -261,7 +276,7 @@ fun MainAppContent(
                             viewModel.reorderCards(it)
                         },
                         leatherFinish = leatherFinish,
-                        isOverlayOpen = (selectedCardForEdit != null || selectedCardForDetail != null || showAddCardChooser || scannedPhysicalCard != null),
+                        isOverlayOpen = (selectedCardForEdit != null || selectedCardForDetail != null || scannedPhysicalCard != null),
                         haptics = haptics
                     )
                 }
