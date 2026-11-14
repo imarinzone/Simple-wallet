@@ -38,6 +38,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Prepare Build Environment & Keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
           # Ensure .env file exists for BuildConfig
           if [ -f .env.example ] && [ ! -f .env ]; then
@@ -46,13 +49,20 @@ jobs:
             touch .env
           fi
 
-          # Decode debug keystore if base64 file exists
-          if [ -f debug.keystore.base64 ] && [ ! -f debug.keystore ]; then
-            base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
+          # Optional custom upload keystore from GitHub Secrets (if configured)
+          if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ -n "$STORE_PASSWORD" ]; then
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > my-upload-key.jks
           fi
 
-          # If debug.keystore is still missing or empty, generate a valid one with keytool
-          if [ ! -f debug.keystore ] || [ ! -s debug.keystore ]; then
+          # Decode persistent repository keystore (strip any CRLF/whitespace so base64 never fails)
+          if [ -f debug.keystore.base64 ]; then
+            tr -d '[:space:]' < debug.keystore.base64 | base64 -d > debug.keystore
+          fi
+
+          # Verify decoded keystore integrity; only generate fallback if no valid keystore exists
+          if ! keytool -list -keystore debug.keystore -storepass android >/dev/null 2>&1; then
+            echo "Warning: debug.keystore missing or invalid, generating fallback keystore"
+            rm -f debug.keystore
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
@@ -70,56 +80,82 @@ jobs:
       - name: Calculate Release Version and Code
         id: versioning
         run: |
+          RUN_NUM="${{ github.run_number }}"
+          MIN_CODE=$(( 1010000 + RUN_NUM ))
+
           if [ "${{ github.event_name }}" = "release" ] && [ -n "${{ github.event.release.tag_name }}" ]; then
             RAW_TAG="${{ github.event.release.tag_name }}"
             V_NAME="${RAW_TAG#v}"
-            V_CODE="${{ github.run_number }}"
+            V_NAME="${V_NAME#V}"
+            IFS='.-_' read -r MAJOR MINOR PATCH _ <<< "$V_NAME"
+            MAJOR=${MAJOR:-1}
+            MINOR=${MINOR:-1}
+            PATCH=${PATCH:-0}
+            if [[ "$MAJOR" =~ ^[0-9]+$ ]] && [[ "$MINOR" =~ ^[0-9]+$ ]] && [[ "$PATCH" =~ ^[0-9]+$ ]]; then
+              TAG_CODE=$(( MAJOR * 1000000 + MINOR * 10000 + PATCH ))
+            else
+              TAG_CODE=$MIN_CODE
+            fi
+            if [ "$TAG_CODE" -gt "$MIN_CODE" ]; then
+              V_CODE=$TAG_CODE
+            else
+              V_CODE=$MIN_CODE
+            fi
           else
-            V_NAME="1.0.${{ github.run_number }}"
-            V_CODE="${{ github.run_number }}"
+            V_NAME="1.1.${RUN_NUM}"
+            V_CODE=$MIN_CODE
           fi
+
           echo "VERSION_NAME=$V_NAME" >> $GITHUB_ENV
           echo "VERSION_CODE=$V_CODE" >> $GITHUB_ENV
           echo "version_name=$V_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$V_CODE" >> $GITHUB_OUTPUT
-          echo "Building version $V_NAME (code: $V_CODE)"
+          echo "Building version $V_NAME (versionCode: $V_CODE)"
 
-      - name: Build APKs with Gradle
+      - name: Build Signed Release APK with Gradle
         env:
           VERSION_NAME: ${{ steps.versioning.outputs.version_name }}
           VERSION_CODE: ${{ steps.versioning.outputs.version_code }}
-        run: ./gradlew assembleDebug assembleRelease --no-daemon --stacktrace
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Organize Output APKs
+      - name: Verify & Organize Signed Release APK
         id: apks
         run: |
           mkdir -p release-apks
-          # Copy any built APKs
-          find app/build/outputs/apk/ -name "*.apk" -type f -exec cp {} release-apks/ \;
-          # Friendly named APK copies
-          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk release-apks/VaultFolio-debug.apk
+          RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$RELEASE_APK" ]; then
+            echo "Error: Signed release APK not found at $RELEASE_APK"
+            exit 1
           fi
-          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk release-apks/VaultFolio-release.apk
-          fi
-          echo "Generated APK files in release-apks:"
-          ls -la release-apks/
 
-      - name: Upload APKs as Workflow Artifact
+          # Verify APK signature with Android SDK apksigner if available
+          APKSIGNER_BIN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$APKSIGNER_BIN" ]; then
+            "$APKSIGNER_BIN" verify -v --print-certs "$RELEASE_APK"
+          fi
+
+          # Publish only signed release APK so users never mix debug and release builds
+          cp "$RELEASE_APK" "release-apks/VaultFolio-release.apk"
+          echo "Generated signed release APK in release-apks:"
+          ls -lh release-apks/
+
+      - name: Upload Release APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VaultFolio-APKs
+          name: VaultFolio-Release-APK
           path: release-apks/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
       - name: Publish APK to GitHub Release
-        if: success() && (github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
+        if: success() && (github.event_name == 'release' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')))
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apks/*.apk
+          files: release-apks/VaultFolio-release.apk
           tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || format('v{0}', steps.versioning.outputs.version_name) }}
           name: ${{ github.event_name == 'release' && github.event.release.name || format('Release v{0}', steps.versioning.outputs.version_name) }}
           generate_release_notes: true

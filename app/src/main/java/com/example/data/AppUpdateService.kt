@@ -36,8 +36,8 @@ object AppUpdateService {
     const val GITHUB_RELEASES_PAGE_URL = "https://github.com/imarinzone/Simple-wallet/releases"
     private const val GITHUB_API_LATEST_RELEASE_URL = "https://api.github.com/repos/imarinzone/Simple-wallet/releases/latest"
 
-    const val DEFAULT_VERSION_NAME = "1.0.18"
-    const val DEFAULT_VERSION_CODE = 18
+    const val DEFAULT_VERSION_NAME = "1.1.0"
+    const val DEFAULT_VERSION_CODE = 1_010_000
 
     val CURRENT_VERSION_NAME: String
         get() = try {
@@ -102,9 +102,13 @@ object AppUpdateService {
                         val name = asset.optString("name", "")
                         val downloadUrl = asset.optString("browser_download_url", "")
                         val sizeBytes = asset.optLong("size", 0L)
-                        if (name.endsWith(".apk", ignoreCase = true)) {
-                            // Prefer release over debug
-                            if (selectedApkUrl == null || name.contains("release", ignoreCase = true)) {
+                        if (
+                            name.endsWith(".apk", ignoreCase = true) &&
+                            !name.contains("unsigned", ignoreCase = true)
+                        ) {
+                            val isReleaseApk = name.contains("release", ignoreCase = true) &&
+                                !name.contains("debug", ignoreCase = true)
+                            if (selectedApkUrl == null || isReleaseApk) {
                                 selectedApkUrl = downloadUrl
                                 selectedApkSize = sizeBytes
                             }
@@ -143,7 +147,7 @@ object AppUpdateService {
         }
 
         // Graceful Fallback for imarinzone/Simple-wallet
-        val fallbackLatestVersion = "1.0.18"
+        val fallbackLatestVersion = DEFAULT_VERSION_NAME
         val isNewer = isVersionNewer(fallbackLatestVersion, currentVersionName)
         val isAvailable = forceAvailableForTest ?: isNewer
 
@@ -188,14 +192,16 @@ object AppUpdateService {
     }
 
     private fun parseVersionCode(versionName: String): Int {
-        val parts = versionName.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
-        var code = 0
-        var multiplier = 10000
-        for (p in parts.take(3)) {
-            code += p * multiplier
-            multiplier /= 100
-        }
-        return if (code > 0) code else 17
+        val parts = versionName
+            .trim()
+            .removePrefix("v")
+            .removePrefix("V")
+            .split(".", "-", "_")
+            .mapNotNull { it.toIntOrNull() }
+        val major = parts.getOrElse(0) { 1 }.coerceAtLeast(1)
+        val minor = parts.getOrElse(1) { 1 }.coerceIn(0, 99)
+        val patch = parts.getOrElse(2) { 0 }.coerceIn(0, 9999)
+        return major * 1_000_000 + minor * 10_000 + patch
     }
 
     private fun formatReleaseDate(rawIso: String): String {

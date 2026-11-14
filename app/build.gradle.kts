@@ -8,15 +8,22 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+fun computeSemverVersionCode(versionName: String): Int {
+  val parts = versionName
+    .trim()
+    .removePrefix("v")
+    .removePrefix("V")
+    .split(".", "-", "_")
+    .mapNotNull { it.toIntOrNull() }
+  val major = parts.getOrElse(0) { 1 }.coerceAtLeast(1)
+  val minor = parts.getOrElse(1) { 1 }.coerceIn(0, 99)
+  val patch = parts.getOrElse(2) { 0 }.coerceIn(0, 9999)
+  return (major * 1_000_000 + minor * 10_000 + patch).coerceAtLeast(1_010_000)
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
-
-  val envVersionCode = providers.environmentVariable("VERSION_CODE")
-    .orElse(providers.environmentVariable("GITHUB_RUN_NUMBER"))
-    .orElse(providers.gradleProperty("versionCode"))
-    .map { it.toIntOrNull() ?: 18 }
-    .getOrElse(18)
 
   val envVersionName = providers.environmentVariable("VERSION_NAME")
     .orElse(providers.gradleProperty("versionName"))
@@ -27,9 +34,20 @@ android {
     )
     .orElse(
       providers.environmentVariable("GITHUB_RUN_NUMBER")
-        .map { "1.0.$it" }
+        .map { "1.1.$it" }
     )
-    .getOrElse("1.0.18")
+    .getOrElse("1.1.0")
+
+  val semverVersionCode = computeSemverVersionCode(envVersionName)
+  val runNumberOffset = providers.environmentVariable("GITHUB_RUN_NUMBER")
+    .map { it.toIntOrNull() ?: 0 }
+    .getOrElse(0)
+  val minUpgradeVersionCode = maxOf(semverVersionCode, 1_010_000 + runNumberOffset)
+
+  val envVersionCode = providers.environmentVariable("VERSION_CODE")
+    .orElse(providers.gradleProperty("versionCode"))
+    .map { raw -> maxOf(raw.toIntOrNull() ?: minUpgradeVersionCode, minUpgradeVersionCode) }
+    .getOrElse(minUpgradeVersionCode)
 
   defaultConfig {
     applicationId = "com.aistudio.vaultfolio.kxpzql"
