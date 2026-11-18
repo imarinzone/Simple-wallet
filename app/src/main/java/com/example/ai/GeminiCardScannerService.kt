@@ -5,6 +5,7 @@ import android.graphics.Rect
 import android.util.Base64
 import android.util.Log
 import com.example.BuildConfig
+import com.example.data.CardBinLookupEngine
 import com.example.data.CardEntity
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -196,12 +197,13 @@ object GeminiCardScannerService {
         }
 
         // Validate all candidates against Luhn Checksum algorithm (ISO/IEC 7812)
-        val verifiedPan = candidatePans.firstOrNull { passesLuhnCheck(it) }
+        val verifiedPan = candidatePans.firstOrNull { CardBinLookupEngine.passesLuhnCheck(it) }
         val finalRawPan = verifiedPan ?: candidatePans.firstOrNull { it.length == 16 } ?: candidatePans.firstOrNull() ?: ""
+        val binLookup = if (finalRawPan.isNotBlank()) CardBinLookupEngine.lookup(finalRawPan) else null
 
         if (finalRawPan.isNotBlank()) {
             detectedNumber = formatPan(finalRawPan)
-            detectedType = determineCardTypeFromPan(finalRawPan)
+            detectedType = binLookup?.network ?: "VISA"
         }
 
         // ==========================================
@@ -235,7 +237,10 @@ object GeminiCardScannerService {
         // 3. EXTRACT BANK / ISSUING INSTITUTION
         // ==========================================
         val knownBanks = listOf(
-            "CHASE", "JPMORGAN", "BANK OF AMERICA", "CAPITAL ONE", "CITI", "CITIBANK",
+            "HDFC BANK", "HDFC", "SBI CARD", "STATE BANK OF INDIA", "SBI",
+            "ICICI BANK", "ICICI", "AXIS BANK", "AXIS", "KOTAK MAHINDRA", "KOTAK",
+            "INDUSIND", "YES BANK", "IDFC FIRST", "CHASE", "JPMORGAN",
+            "BANK OF AMERICA", "CAPITAL ONE", "CITI", "CITIBANK",
             "WELLS FARGO", "AMERICAN EXPRESS", "AMEX", "DISCOVER", "BARCLAYS", "BARCLAYCARD",
             "USAA", "NAVY FEDERAL", "PNC", "TD BANK", "HSBC", "SYNCHRONY", "US BANK",
             "REGIONS", "FIFTH THIRD", "BMO", "HARRIS", "KEYBANK", "HUNTINGTON", "SANTANDER",
@@ -245,6 +250,16 @@ object GeminiCardScannerService {
         for (bank in knownBanks) {
             if (rawFullText.uppercase(Locale.US).contains(bank)) {
                 detectedBank = when (bank) {
+                    "HDFC BANK", "HDFC" -> "HDFC Bank"
+                    "SBI CARD", "SBI" -> "SBI Card"
+                    "STATE BANK OF INDIA" -> "State Bank of India"
+                    "ICICI BANK", "ICICI" -> "ICICI Bank"
+                    "AXIS BANK", "AXIS" -> "Axis Bank"
+                    "KOTAK MAHINDRA", "KOTAK" -> "Kotak Mahindra Bank"
+                    "INDUSIND" -> "IndusInd Bank"
+                    "YES BANK" -> "Yes Bank"
+                    "IDFC FIRST" -> "IDFC FIRST Bank"
+                    "HSBC" -> "HSBC"
                     "CHASE", "JPMORGAN" -> "JPMorgan Chase"
                     "BANK OF AMERICA" -> "Bank of America"
                     "CAPITAL ONE" -> "Capital One"
@@ -260,6 +275,11 @@ object GeminiCardScannerService {
                 }
                 break
             }
+        }
+
+        // Offline BIN lookup fallback when issuing bank was not matched in OCR text
+        if (detectedBank.isBlank() && binLookup?.issuerBank != null) {
+            detectedBank = binLookup.issuerBank
         }
 
         // ==========================================
@@ -321,17 +341,20 @@ object GeminiCardScannerService {
         // ==========================================
         // 5. DETERMINE NETWORK FROM OCR TEXT IF PAN IS MASKED
         // ==========================================
-        if (detectedType == "VISA") {
+        if (binLookup?.network == null) {
             val upperText = rawFullText.uppercase(Locale.US)
             when {
                 upperText.contains("MASTERCARD") || upperText.contains("MASTER CARD") -> detectedType = "MASTERCARD"
                 upperText.contains("AMERICAN EXPRESS") || upperText.contains("AMEX") -> detectedType = "AMEX"
+                upperText.contains("RUPAY") -> detectedType = "RUPAY"
+                upperText.contains("DINERS") -> detectedType = "DINERS"
                 upperText.contains("DISCOVER") -> detectedType = "DISCOVER"
                 upperText.contains("UNIONPAY") -> detectedType = "UNIONPAY"
+                upperText.contains("JCB") -> detectedType = "JCB"
             }
         }
 
-        val colors = getDefaultColorsForType(detectedType)
+        val colors = CardBinLookupEngine.getDefaultColorsForType(detectedType, detectedBank.ifBlank { null })
         val issuerTitle = if (detectedBank.isNotBlank()) "$detectedBank $detectedType" else "$detectedType Card"
 
         return CardEntity(
@@ -342,29 +365,13 @@ object GeminiCardScannerService {
             cvv = "",
             cardType = detectedType,
             category = "PAYMENT",
-            bankOrIssuer = detectedBank.ifBlank { detectedType },
+            bankOrIssuer = detectedBank,
             themeColorHex = colors.first,
             gradientEndHex = colors.second,
             notes = "Scanned on-device with high-accuracy Google ML Kit Text OCR",
             scannedVia = "CAMERA_AI",
             createdAt = System.currentTimeMillis()
         )
-    }
-
-    private fun passesLuhnCheck(digits: String): Boolean {
-        if (digits.length < 13 || digits.length > 19) return false
-        var sum = 0
-        var alternate = false
-        for (i in digits.length - 1 downTo 0) {
-            var n = digits[i] - '0'
-            if (alternate) {
-                n *= 2
-                if (n > 9) n = (n % 10) + 1
-            }
-            sum += n
-            alternate = !alternate
-        }
-        return (sum % 10 == 0)
     }
 
     private fun formatPan(rawDigits: String): String {
@@ -375,20 +382,6 @@ object GeminiCardScannerService {
         } else {
             // Standard format: 4 - 4 - 4 - 4
             clean.chunked(4).joinToString(" ")
-        }
-    }
-
-    private fun determineCardTypeFromPan(digits: String): String {
-        return when {
-            digits.startsWith("4") -> "VISA"
-            digits.startsWith("51") || digits.startsWith("52") || digits.startsWith("53") ||
-                    digits.startsWith("54") || digits.startsWith("55") ||
-                    (digits.length >= 4 && digits.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
-            digits.startsWith("34") || digits.startsWith("37") -> "AMEX"
-            digits.startsWith("6011") || digits.startsWith("65") || (digits.length >= 3 && digits.substring(0, 3).toIntOrNull() in 644..649) -> "DISCOVER"
-            digits.startsWith("35") -> "JCB"
-            digits.startsWith("62") -> "UNIONPAY"
-            else -> "VISA"
         }
     }
 
@@ -426,7 +419,7 @@ object GeminiCardScannerService {
                   "cardNumber": "string (digits separated by spaces, e.g. 4123 4567 8901 2345)",
                   "expiryDate": "string (format MM/YY if explicitly printed, otherwise empty \"\")",
                   "cvv": "string (3 or 4 digits if explicitly legible, otherwise empty \"\")",
-                  "cardType": "VISA | MASTERCARD | AMEX | DISCOVER | ID_CARD | LOYALTY | TRANSIT",
+                  "cardType": "VISA | MASTERCARD | RUPAY | AMEX | DINERS | DISCOVER | JCB | UNIONPAY | ID_CARD | LOYALTY | TRANSIT",
                   "category": "PAYMENT | IDENTITY | MEMBERSHIP | TRANSIT",
                   "bankOrIssuer": "string (e.g. Chase, American Express, Citi, Wells Fargo)",
                   "themeColorHex": "string (dominant hex color of the card, e.g. #1E293B)",
@@ -490,13 +483,21 @@ object GeminiCardScannerService {
             } else onDeviceCard.cardholderName
 
             val finalExpiry = if (geminiCard.expiryDate.isNotBlank()) geminiCard.expiryDate else onDeviceCard.expiryDate
-            val finalBank = if (geminiCard.bankOrIssuer.isNotBlank()) geminiCard.bankOrIssuer else onDeviceCard.bankOrIssuer
+            val panBin = CardBinLookupEngine.lookup(finalPan)
+            val finalBank = when {
+                geminiCard.bankOrIssuer.isNotBlank() && !CardBinLookupEngine.isGenericNfcBank(geminiCard.bankOrIssuer) -> geminiCard.bankOrIssuer
+                onDeviceCard.bankOrIssuer.isNotBlank() && !CardBinLookupEngine.isGenericNfcBank(onDeviceCard.bankOrIssuer) -> onDeviceCard.bankOrIssuer
+                !panBin.issuerBank.isNullOrBlank() -> panBin.issuerBank
+                else -> ""
+            }
+            val finalCardType = panBin.network ?: geminiCard.cardType
 
             val mergedCard = geminiCard.copy(
                 cardNumber = finalPan,
                 cardholderName = finalHolder,
                 expiryDate = finalExpiry,
                 bankOrIssuer = finalBank,
+                cardType = finalCardType,
                 notes = "Scanned using Gemini 3.5 Flash & Google ML Kit OCR"
             )
 
@@ -551,16 +552,6 @@ object GeminiCardScannerService {
     }
 
     private fun getDefaultColorsForType(cardType: String): Pair<String, String> {
-        return when (cardType) {
-            "AMEX" -> Pair("#161618", "#2F3136")
-            "MASTERCARD" -> Pair("#854D0E", "#CA8A04")
-            "VISA" -> Pair("#0C2340", "#1D4ED8")
-            "DISCOVER" -> Pair("#C2410C", "#EA580C")
-            "UNIONPAY" -> Pair("#B91C1C", "#DC2626")
-            "JCB" -> Pair("#1E3A8A", "#2563EB")
-            "ID_CARD" -> Pair("#134E4A", "#0F766E")
-            "TRANSIT" -> Pair("#701A75", "#A21CAF")
-            else -> Pair("#1E293B", "#0F172A")
-        }
+        return CardBinLookupEngine.getDefaultColorsForType(cardType)
     }
 }

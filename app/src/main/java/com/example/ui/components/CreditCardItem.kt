@@ -616,6 +616,66 @@ fun CardNetworkLogoBadge(cardType: String, modifier: Modifier = Modifier) {
                 )
             }
         }
+        "JCB" -> {
+            Row(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF0F172A).copy(alpha = 0.75f))
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 6.dp, height = 12.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0xFF1D4ED8))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 6.dp, height = 12.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0xFFDC2626))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 6.dp, height = 12.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0xFF16A34A))
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = "JCB",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.5.sp
+                )
+            }
+        }
+        "UNIONPAY" -> {
+            Box(
+                modifier = modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color(0xFFB91C1C),
+                                Color(0xFF0F766E)
+                            )
+                        )
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "UnionPay",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.4.sp
+                )
+            }
+        }
         "ID_CARD" -> {
             Box(
                 modifier = modifier

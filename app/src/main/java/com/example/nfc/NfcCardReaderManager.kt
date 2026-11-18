@@ -11,6 +11,7 @@ import android.nfc.tech.IsoDep
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import com.example.data.CardBinLookupEngine
 import com.example.data.CardEntity
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
@@ -134,6 +135,7 @@ class NfcCardReaderManager(private val context: Context) {
 
         var detectedType = "CONTACTLESS"
         var bankName = "Contactless Card"
+        var hasRealEmvLabel = false
         var aidHex = ""
         var realPan = ""
         var realExpiry = ""
@@ -175,6 +177,7 @@ class NfcCardReaderManager(private val context: Context) {
                         "A0000000043060", // Maestro
                         "A0000000032010", // Visa Electron
                         "A0000000033010", // Visa Interlink
+                        "A0000005241010", // RuPay
                         "A00000002501",   // American Express
                         "A0000001523010", // Discover
                         "A0000001524010", // Diners Club
@@ -217,6 +220,10 @@ class NfcCardReaderManager(private val context: Context) {
                                 detectedType = "MASTERCARD"
                                 bankName = "Mastercard Contactless"
                             }
+                            aidStr.startsWith("A000000524") -> {
+                                detectedType = "RUPAY"
+                                bankName = "RuPay Contactless"
+                            }
                             aidStr.startsWith("A000000025") -> {
                                 detectedType = "AMEX"
                                 bankName = "American Express"
@@ -240,8 +247,10 @@ class NfcCardReaderManager(private val context: Context) {
                         val prefName = extractTlvString(aidResponse, "9F12")
                         if (prefName.isNotBlank()) {
                             bankName = prefName
+                            hasRealEmvLabel = true
                         } else if (appLabel.isNotBlank()) {
                             bankName = appLabel
+                            hasRealEmvLabel = true
                         }
 
                         // 3. Send GET PROCESSING OPTIONS (GPO)
@@ -397,16 +406,26 @@ class NfcCardReaderManager(private val context: Context) {
             }
         }
 
-        // Color theme mapping based on card brand
-        val (themeHex, gradHex) = when (detectedType) {
-            "AMEX" -> Pair("#161618", "#2F3136")
-            "MASTERCARD" -> Pair("#854D0E", "#CA8A04")
-            "VISA" -> Pair("#0C2340", "#1D4ED8")
-            "DISCOVER" -> Pair("#C2410C", "#EA580C")
-            "UNIONPAY" -> Pair("#B91C1C", "#DC2626")
-            "JCB" -> Pair("#1E3A8A", "#2563EB")
-            else -> Pair("#0284C7", "#0369A1")
+        // Enrich missing or generic NFC fields from PAN BIN lookup without overriding real NFC metadata
+        if (realPan.isNotBlank()) {
+            val existingBankForMerge = if (hasRealEmvLabel) bankName else ""
+            val nfcMerge = CardBinLookupEngine.resolveWithNfcPrecedence(
+                existingNetwork = detectedType,
+                existingBank = existingBankForMerge,
+                rawCardNumber = realPan,
+                isFromNfc = true
+            )
+            detectedType = nfcMerge.network
+            if (nfcMerge.bankOrIssuer.isNotBlank()) {
+                bankName = nfcMerge.bankOrIssuer
+            }
         }
+
+        // Color theme mapping based on card brand / bank
+        val (themeHex, gradHex) = CardBinLookupEngine.getDefaultColorsForType(
+            cardType = detectedType,
+            issuerBank = bankName.takeIf { !CardBinLookupEngine.isGenericNfcBank(it) }
+        )
 
         val hasFullPan = realPan.isNotBlank()
         val hasName = realCardholder.isNotBlank()

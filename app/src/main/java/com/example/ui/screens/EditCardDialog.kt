@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -80,8 +81,11 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.CardArtDesign
 import com.example.data.CardArtOnlineService
+import com.example.data.CardBinLookupEngine
 import com.example.data.CardEntity
+import com.example.data.PaymentNetwork
 import com.example.security.HapticsHelper
+import com.example.ui.components.BinDetectionBanner
 import com.example.ui.components.CreditCardItem
 import kotlinx.coroutines.launch
 
@@ -119,6 +123,24 @@ fun EditCardScreen(
     var themeColorHex by remember { mutableStateOf(card.themeColorHex) }
     var gradientEndHex by remember { mutableStateOf(card.gradientEndHex) }
     var notes by remember { mutableStateOf(card.notes) }
+
+    val isNfcOrigin = remember(card.scannedVia, card.nfcTagUid) {
+        card.scannedVia.equals("NFC", ignoreCase = true) || card.nfcTagUid.isNotBlank()
+    }
+    val isPaymentEditable = remember(card.category, card.cardType) {
+        card.category.equals("PAYMENT", ignoreCase = true) ||
+            CardBinLookupEngine.isKnownPaymentNetwork(card.cardType) ||
+            card.cardType.equals("CONTACTLESS", ignoreCase = true)
+    }
+    var hasUserSelectedNetwork by remember { mutableStateOf(false) }
+    var hasUserEditedBank by remember {
+        mutableStateOf(
+            !isNfcOrigin &&
+                bankOrIssuer.isNotBlank() &&
+                !CardBinLookupEngine.isGenericNfcBank(bankOrIssuer)
+        )
+    }
+    var lastAutoFilledBank by remember { mutableStateOf("") }
 
     // Online Art Search State
     var showArtPickerSection by remember { mutableStateOf(true) }
@@ -594,10 +616,15 @@ fun EditCardScreen(
 
             OutlinedTextField(
                 value = bankOrIssuer,
-                onValueChange = { bankOrIssuer = it },
-                label = { Text("Bank / Issuer (e.g. Chase, Amex, Apple)") },
+                onValueChange = { input ->
+                    bankOrIssuer = input
+                    hasUserEditedBank = input.isNotBlank()
+                },
+                label = { Text("Bank / Issuer (e.g. HDFC Bank, SBI Card, HSBC)") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("edit_bank_issuer_input"),
                 colors = fieldColors,
                 shape = RoundedCornerShape(12.dp)
             )
@@ -619,29 +646,25 @@ fun EditCardScreen(
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(
-                        "VISA" to "Visa",
-                        "MASTERCARD" to "Mastercard",
-                        "DINERS" to "Diners Club",
-                        "AMEX" to "AMEX",
-                        "RUPAY" to "RuPay",
-                        "DISCOVER" to "Discover"
-                    ).forEach { (netKey, netLabel) ->
-                        val isSelected = cardType.equals(netKey, ignoreCase = true) || (netKey == "DINERS" && cardType.uppercase().contains("DINER"))
+                    PaymentNetwork.entries.forEach { net ->
+                        val isSelected = cardType.equals(net.key, ignoreCase = true) ||
+                            (net == PaymentNetwork.DINERS && cardType.uppercase().contains("DINER"))
                         FilterChip(
                             selected = isSelected,
                             onClick = {
                                 haptics?.cardSelect()
-                                cardType = netKey
+                                cardType = net.key
+                                hasUserSelectedNetwork = true
                             },
                             label = {
                                 Text(
-                                    text = netLabel,
+                                    text = net.displayName,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                 )
                             },
+                            modifier = Modifier.testTag("edit_network_chip_${net.key.lowercase()}"),
                             shape = RoundedCornerShape(16.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -673,14 +696,101 @@ fun EditCardScreen(
             OutlinedTextField(
                 value = rawCardNumber,
                 onValueChange = { input ->
-                    rawCardNumber = input.filter { it.isLetterOrDigit() }.take(24)
+                    val clean = if (isPaymentEditable) {
+                        input.filter { it.isDigit() }.take(19)
+                    } else {
+                        input.filter { it.isLetterOrDigit() }.take(24)
+                    }
+                    rawCardNumber = clean
+                    if (isPaymentEditable) {
+                        if (isNfcOrigin) {
+                            val effectiveExistingBank = if (bankOrIssuer == lastAutoFilledBank && lastAutoFilledBank.isNotBlank()) {
+                                ""
+                            } else {
+                                bankOrIssuer
+                            }
+                            val merged = CardBinLookupEngine.resolveWithNfcPrecedence(
+                                existingNetwork = cardType,
+                                existingBank = effectiveExistingBank,
+                                rawCardNumber = clean,
+                                isFromNfc = true
+                            )
+                            if (!hasUserSelectedNetwork && merged.filledNetworkFromBin) {
+                                cardType = merged.network
+                            }
+                            if (!hasUserEditedBank) {
+                                if (merged.filledBankFromBin) {
+                                    bankOrIssuer = merged.bankOrIssuer
+                                    lastAutoFilledBank = merged.bankOrIssuer
+                                } else if (bankOrIssuer == lastAutoFilledBank && lastAutoFilledBank.isNotBlank() && effectiveExistingBank.isBlank()) {
+                                    bankOrIssuer = ""
+                                    lastAutoFilledBank = ""
+                                }
+                            }
+                        } else {
+                            val binResult = CardBinLookupEngine.lookup(clean)
+                            if (!hasUserSelectedNetwork && binResult.network != null) {
+                                cardType = binResult.network
+                            }
+                            if (binResult.issuerBank != null && (!hasUserEditedBank || bankOrIssuer.isBlank() || bankOrIssuer == lastAutoFilledBank)) {
+                                bankOrIssuer = binResult.issuerBank
+                                lastAutoFilledBank = binResult.issuerBank
+                            } else if (binResult.issuerBank == null && !hasUserEditedBank && bankOrIssuer == lastAutoFilledBank && lastAutoFilledBank.isNotBlank()) {
+                                bankOrIssuer = ""
+                                lastAutoFilledBank = ""
+                            }
+                        }
+                    }
                 },
                 label = { Text("Card Number / Identifier") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("edit_card_number_input"),
                 colors = fieldColors,
                 shape = RoundedCornerShape(12.dp)
             )
+
+            if (isPaymentEditable && rawCardNumber.any { it.isDigit() }) {
+                val liveBinResult = remember(rawCardNumber) { CardBinLookupEngine.lookup(rawCardNumber) }
+                val canShowApply = if (isNfcOrigin) {
+                    (CardBinLookupEngine.isGenericNfcNetwork(cardType) && liveBinResult.network != null) ||
+                        (CardBinLookupEngine.isGenericNfcBank(bankOrIssuer) && liveBinResult.issuerBank != null)
+                } else {
+                    (liveBinResult.network != null && !liveBinResult.network.equals(cardType, ignoreCase = true)) ||
+                        (liveBinResult.issuerBank != null && !liveBinResult.issuerBank.equals(bankOrIssuer, ignoreCase = true))
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                BinDetectionBanner(
+                    lookupResult = liveBinResult,
+                    isNfcOrigin = isNfcOrigin,
+                    showApplyDetectedAction = canShowApply,
+                    onApplyDetected = {
+                        haptics?.cardSelect()
+                        if (isNfcOrigin) {
+                            val merged = CardBinLookupEngine.resolveWithNfcPrecedence(
+                                existingNetwork = cardType,
+                                existingBank = bankOrIssuer,
+                                rawCardNumber = rawCardNumber,
+                                isFromNfc = true
+                            )
+                            cardType = merged.network
+                            bankOrIssuer = merged.bankOrIssuer
+                            if (merged.filledBankFromBin) {
+                                lastAutoFilledBank = merged.bankOrIssuer
+                            }
+                        } else {
+                            hasUserSelectedNetwork = false
+                            hasUserEditedBank = false
+                            liveBinResult.network?.let { cardType = it }
+                            liveBinResult.issuerBank?.let {
+                                bankOrIssuer = it
+                                lastAutoFilledBank = it
+                            }
+                        }
+                    }
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -735,7 +845,8 @@ fun EditCardScreen(
                 onClick = { performSave() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
+                    .testTag("edit_save_card_button"),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.elevatedButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,

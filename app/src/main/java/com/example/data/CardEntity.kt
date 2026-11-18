@@ -26,7 +26,10 @@ data class CardEntity(
     val slotIndex: Int = 0
 ) {
     val isPaymentCard: Boolean
-        get() = cardType.uppercase() in listOf("VISA", "MASTERCARD", "AMEX", "DISCOVER", "RUPAY", "DINERS", "DINERS_CLUB", "DINNERCLUB")
+        get() = cardType.uppercase() in listOf(
+            "VISA", "MASTERCARD", "AMEX", "DISCOVER", "RUPAY",
+            "DINERS", "DINERS_CLUB", "DINNERCLUB", "JCB", "UNIONPAY"
+        )
 
     val maskedNumber: String
         get() {

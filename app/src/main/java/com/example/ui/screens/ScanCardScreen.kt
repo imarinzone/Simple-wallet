@@ -89,6 +89,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -102,8 +103,11 @@ import com.example.ai.GeminiCardScannerService
 import com.example.ai.ScanResult
 import com.example.data.CardArtDesign
 import com.example.data.CardArtOnlineService
+import com.example.data.CardBinLookupEngine
 import com.example.data.CardEntity
+import com.example.data.PaymentNetwork
 import com.example.security.HapticsHelper
+import com.example.ui.components.BinDetectionBanner
 import com.example.ui.components.CameraXCardScannerView
 import com.example.ui.components.CreditCardItem
 import com.example.ui.theme.BitmapPaletteExtractor
@@ -223,16 +227,26 @@ fun ScanCardScreen(
     var showSettingDisabledPrompt by remember { mutableStateOf(false) }
 
     var paymentNetwork by remember { mutableStateOf("VISA") }
+    var hasUserSelectedNetwork by remember { mutableStateOf(false) }
+    var hasUserEditedBank by remember { mutableStateOf(false) }
+    var hasUserPickedColor by remember { mutableStateOf(false) }
+    var lastAutoFilledBank by remember { mutableStateOf("") }
 
-    fun updateNetworkFromPan(pan: String) {
-        val clean = pan.filter { it.isDigit() }
-        when {
-            clean.startsWith("4") -> paymentNetwork = "VISA"
-            clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") ||
-                    (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> paymentNetwork = "MASTERCARD"
-            clean.startsWith("34") || clean.startsWith("37") -> paymentNetwork = "AMEX"
-            clean.startsWith("36") || clean.startsWith("38") || clean.startsWith("30") || clean.startsWith("39") -> paymentNetwork = "DINERS"
-            clean.startsWith("60") || clean.startsWith("65") || clean.startsWith("81") || clean.startsWith("82") || clean.startsWith("508") || clean.startsWith("353") || clean.startsWith("356") -> paymentNetwork = "RUPAY"
+    fun applyLiveBinDetection(pan: String) {
+        val binResult = CardBinLookupEngine.lookup(pan)
+        if (!hasUserSelectedNetwork && binResult.network != null) {
+            paymentNetwork = binResult.network
+        }
+        if (binResult.issuerBank != null && (!hasUserEditedBank || bankOrIssuer.isBlank() || bankOrIssuer == lastAutoFilledBank)) {
+            bankOrIssuer = binResult.issuerBank
+            lastAutoFilledBank = binResult.issuerBank
+        } else if (binResult.issuerBank == null && !hasUserEditedBank && bankOrIssuer == lastAutoFilledBank && lastAutoFilledBank.isNotBlank()) {
+            bankOrIssuer = ""
+            lastAutoFilledBank = ""
+        }
+        if (!hasUserPickedColor && binResult.suggestedColors != null && cardArtUrl.isBlank()) {
+            selectedHex = binResult.suggestedColors.first
+            secondaryHex = binResult.suggestedColors.second
         }
     }
 
@@ -272,19 +286,40 @@ fun ScanCardScreen(
                     statusText = ""
                     title = result.card.title
                     cardholderName = result.card.cardholderName
-                    rawCardNumber = result.card.cardNumber.replace("\\s+".toRegex(), "")
+                    val scannedPan = result.card.cardNumber.replace("\\s+".toRegex(), "")
+                    rawCardNumber = scannedPan
                     rawExpiryDigits = if (result.card.cardType in listOf("ID_CARD", "RC_CARD", "VOUCHER", "MISC")) {
                         result.card.expiryDate
                     } else {
                         result.card.expiryDate.filter { it.isDigit() }
                     }
                     cvv = result.card.cvv
-                    bankOrIssuer = result.card.bankOrIssuer
-                    if (result.card.cardType.uppercase() in listOf("VISA", "MASTERCARD", "DINERS", "DINERS_CLUB", "DINNERCLUB", "AMEX", "RUPAY")) {
-                        paymentNetwork = if (result.card.cardType.uppercase().contains("DINER")) "DINERS" else result.card.cardType.uppercase()
-                    } else {
-                        updateNetworkFromPan(result.card.cardNumber)
+
+                    val binResult = CardBinLookupEngine.lookup(scannedPan)
+                    val parsedNetwork = PaymentNetwork.fromKey(result.card.cardType)
+                    if (parsedNetwork != null) {
+                        paymentNetwork = parsedNetwork.key
+                    } else if (binResult.network != null) {
+                        paymentNetwork = binResult.network
                     }
+
+                    val scannedBank = result.card.bankOrIssuer.trim()
+                    if (scannedBank.isNotBlank() && !CardBinLookupEngine.isGenericNfcBank(scannedBank)) {
+                        bankOrIssuer = scannedBank
+                        hasUserEditedBank = true
+                        lastAutoFilledBank = ""
+                    } else if (binResult.issuerBank != null) {
+                        bankOrIssuer = binResult.issuerBank
+                        hasUserEditedBank = false
+                        lastAutoFilledBank = binResult.issuerBank
+                    } else {
+                        bankOrIssuer = ""
+                        hasUserEditedBank = false
+                        lastAutoFilledBank = ""
+                    }
+                    hasUserSelectedNetwork = false
+                    hasUserPickedColor = false
+
                     selectedCategoryType = when (result.card.cardType) {
                         "ID_CARD" -> CardCategoryType.ID_CARD
                         "RC_CARD" -> CardCategoryType.RC_CARD
@@ -309,8 +344,8 @@ fun ScanCardScreen(
                             if (bankOrIssuer.isBlank()) {
                                 bankOrIssuer = suggested.issuer
                             }
-                            if (suggested.cardType.isNotBlank()) {
-                                paymentNetwork = if (suggested.cardType.uppercase().contains("DINER")) "DINERS" else suggested.cardType.uppercase()
+                            PaymentNetwork.fromKey(suggested.cardType)?.let {
+                                paymentNetwork = it.key
                             }
                         }
                     }
@@ -630,28 +665,24 @@ fun ScanCardScreen(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(
-                            "VISA" to "Visa",
-                            "MASTERCARD" to "Mastercard",
-                            "DINERS" to "Diners Club",
-                            "AMEX" to "AMEX",
-                            "RUPAY" to "RuPay"
-                        ).forEach { (netKey, netLabel) ->
-                            val isSelected = paymentNetwork.equals(netKey, ignoreCase = true)
+                        PaymentNetwork.entries.forEach { net ->
+                            val isSelected = paymentNetwork.equals(net.key, ignoreCase = true)
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
                                     haptics?.cardSelect()
-                                    paymentNetwork = netKey
+                                    paymentNetwork = net.key
+                                    hasUserSelectedNetwork = true
                                 },
                                 label = {
                                     Text(
-                                        text = netLabel,
+                                        text = net.displayName,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                     )
                                 },
+                                modifier = Modifier.testTag("network_chip_${net.key.lowercase()}"),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -974,7 +1005,9 @@ fun ScanCardScreen(
                     onValueChange = { input ->
                         if (isPayment) {
                             // Payment cards: store digits directly without mutating with spaces
-                            rawCardNumber = input.filter { it.isDigit() }.take(19)
+                            val clean = input.filter { it.isDigit() }.take(19)
+                            rawCardNumber = clean
+                            applyLiveBinDetection(clean)
                         } else {
                             // ID cards, RC cards, Vouchers, Misc: completely alphanumeric without restrictive filters!
                             rawCardNumber = input.uppercase().take(30)
@@ -1001,10 +1034,40 @@ fun ScanCardScreen(
                         keyboardType = if (isPayment) KeyboardType.Number else KeyboardType.Ascii,
                         capitalization = KeyboardCapitalization.Characters
                     ),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("card_number_input"),
                     colors = fieldColors,
                     singleLine = true
                 )
+
+                val liveBinResult = remember(rawCardNumber, isPayment) {
+                    if (isPayment) CardBinLookupEngine.lookup(rawCardNumber) else null
+                }
+                if (isPayment && liveBinResult != null && rawCardNumber.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    val networkDiffers = liveBinResult.network != null && !liveBinResult.network.equals(paymentNetwork, ignoreCase = true)
+                    val bankDiffers = liveBinResult.issuerBank != null && !liveBinResult.issuerBank.equals(bankOrIssuer, ignoreCase = true)
+                    BinDetectionBanner(
+                        lookupResult = liveBinResult,
+                        isNfcOrigin = false,
+                        showApplyDetectedAction = (hasUserSelectedNetwork && networkDiffers) || (hasUserEditedBank && bankDiffers),
+                        onApplyDetected = {
+                            haptics?.cardSelect()
+                            hasUserSelectedNetwork = false
+                            hasUserEditedBank = false
+                            liveBinResult.network?.let { paymentNetwork = it }
+                            liveBinResult.issuerBank?.let {
+                                bankOrIssuer = it
+                                lastAutoFilledBank = it
+                            }
+                            if (!hasUserPickedColor && liveBinResult.suggestedColors != null && cardArtUrl.isBlank()) {
+                                selectedHex = liveBinResult.suggestedColors.first
+                                secondaryHex = liveBinResult.suggestedColors.second
+                            }
+                        }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -1077,7 +1140,10 @@ fun ScanCardScreen(
                 // 5. Issuer / Authority
                 OutlinedTextField(
                     value = bankOrIssuer,
-                    onValueChange = { bankOrIssuer = it },
+                    onValueChange = { input ->
+                        bankOrIssuer = input
+                        hasUserEditedBank = input.isNotBlank()
+                    },
                     label = {
                         Text(
                             when (selectedCategoryType) {
@@ -1088,7 +1154,9 @@ fun ScanCardScreen(
                             }
                         )
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("bank_issuer_input"),
                     colors = fieldColors,
                     singleLine = true
                 )
@@ -1125,7 +1193,10 @@ fun ScanCardScreen(
                                     color = if (selectedHex == hex) MaterialTheme.colorScheme.primary else Color.Transparent,
                                     shape = CircleShape
                                 )
-                                .clickable { selectedHex = hex }
+                                .clickable {
+                                    selectedHex = hex
+                                    hasUserPickedColor = true
+                                }
                         )
                     }
                 }
@@ -1168,7 +1239,8 @@ fun ScanCardScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(50.dp)
+                        .testTag("save_card_button"),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,

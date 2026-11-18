@@ -14,12 +14,16 @@ class CardEntityTest {
         val mastercard = CardEntity(title = "MC", cardholderName = "Jane Doe", cardNumber = "5100123456789010", expiryDate = "12/28", cardType = "MASTERCARD")
         val amex = CardEntity(title = "Amex", cardholderName = "Jane Doe", cardNumber = "378282246310005", expiryDate = "12/28", cardType = "AMEX")
         val rupay = CardEntity(title = "RuPay", cardholderName = "Jane Doe", cardNumber = "6071123456789010", expiryDate = "12/28", cardType = "RUPAY")
+        val jcb = CardEntity(title = "JCB", cardholderName = "Jane Doe", cardNumber = "3528123456789010", expiryDate = "12/28", cardType = "JCB")
+        val unionPay = CardEntity(title = "UnionPay", cardholderName = "Jane Doe", cardNumber = "6200123456789010", expiryDate = "12/28", cardType = "UNIONPAY")
         val idCard = CardEntity(title = "ID Card", cardholderName = "Jane Doe", cardNumber = "DL-98234-XYZ", expiryDate = "12/35", cardType = "ID_CARD")
 
         assertTrue(visa.isPaymentCard)
         assertTrue(mastercard.isPaymentCard)
         assertTrue(amex.isPaymentCard)
         assertTrue(rupay.isPaymentCard)
+        assertTrue(jcb.isPaymentCard)
+        assertTrue(unionPay.isPaymentCard)
         assertFalse(idCard.isPaymentCard)
     }
 

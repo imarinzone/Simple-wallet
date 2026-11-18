@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -71,10 +72,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.CardArtOnlineService
+import com.example.data.CardBinLookupEngine
 import com.example.data.CardEntity
+import com.example.data.PaymentNetwork
 import com.example.nfc.NfcCardReaderManager
 import com.example.nfc.NfcReadResult
 import com.example.security.HapticsHelper
+import com.example.ui.components.BinDetectionBanner
 import com.example.ui.components.CreditCardItem
 
 class NfcExpiryDateVisualTransformation : VisualTransformation {
@@ -130,6 +134,9 @@ fun NfcScanScreen(
     var bankOrIssuer by remember { mutableStateOf("") }
     var cardType by remember { mutableStateOf("VISA") }
     var cardArtUrl by remember { mutableStateOf("") }
+    var hasUserSelectedNetwork by remember { mutableStateOf(false) }
+    var hasUserEditedBank by remember { mutableStateOf(false) }
+    var lastAutoFilledBank by remember { mutableStateOf("") }
 
     // Start real NFC hardware listener
     DisposableEffect(Unit) {
@@ -138,23 +145,39 @@ fun NfcScanScreen(
                 haptics?.success()
                 readResult = result
                 detectedCard = result.suggestedCard
+                hasUserSelectedNetwork = false
+                hasUserEditedBank = false
+                lastAutoFilledBank = ""
 
                 result.suggestedCard?.let { card ->
                     cardTitle = card.title
                     rawCardNumber = card.cardNumber.replace("\\s+".toRegex(), "")
                     cardholderName = card.cardholderName
                     rawExpiryDigits = card.expiryDate.filter { it.isDigit() }
-                    bankOrIssuer = card.bankOrIssuer
-                    cardType = card.cardType
+                    val merged = CardBinLookupEngine.resolveWithNfcPrecedence(
+                        existingNetwork = card.cardType,
+                        existingBank = card.bankOrIssuer,
+                        rawCardNumber = rawCardNumber,
+                        isFromNfc = true
+                    )
+                    cardType = merged.network
+                    bankOrIssuer = merged.bankOrIssuer
+                    if (merged.filledBankFromBin) {
+                        lastAutoFilledBank = merged.bankOrIssuer
+                    }
                     if (isOnlineCardArtEnabled) {
-                        val suggested = CardArtOnlineService.suggestArtForCard(card)
+                        val suggested = CardArtOnlineService.suggestArtForCard(
+                            card.copy(cardType = cardType, bankOrIssuer = bankOrIssuer)
+                        )
                         if (suggested != null) {
                             cardArtUrl = suggested.imageUrl
-                            if (bankOrIssuer.isBlank()) {
+                            if (CardBinLookupEngine.isGenericNfcBank(bankOrIssuer)) {
                                 bankOrIssuer = suggested.issuer
                             }
-                            if (suggested.cardType.isNotBlank()) {
-                                cardType = if (suggested.cardType.uppercase().contains("DINER")) "DINERS" else suggested.cardType.uppercase()
+                            if (CardBinLookupEngine.isGenericNfcNetwork(cardType) && suggested.cardType.isNotBlank()) {
+                                PaymentNetwork.fromKey(suggested.cardType)?.let {
+                                    cardType = it.key
+                                }
                             }
                         }
                     }
@@ -396,29 +419,55 @@ fun NfcScanScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Card Number input with PaymentCardVisualTransformation to prevent cursor jump!
+                            // Card Number input with PaymentCardVisualTransformation & strict NFC precedence BIN enrichment
                             OutlinedTextField(
                                 value = rawCardNumber,
                                 onValueChange = { input ->
                                     val clean = input.filter { it.isDigit() }.take(19)
                                     rawCardNumber = clean
-                                    cardType = when {
-                                        clean.startsWith("4") -> "VISA"
-                                        clean.startsWith("51") || clean.startsWith("52") || clean.startsWith("53") || clean.startsWith("54") || clean.startsWith("55") || (clean.length >= 4 && clean.substring(0, 4).toIntOrNull() in 2221..2720) -> "MASTERCARD"
-                                        clean.startsWith("34") || clean.startsWith("37") -> "AMEX"
-                                        clean.startsWith("36") || clean.startsWith("38") || clean.startsWith("30") || clean.startsWith("39") -> "DINERS"
-                                        clean.startsWith("60") || clean.startsWith("65") || clean.startsWith("81") || clean.startsWith("82") || clean.startsWith("508") || clean.startsWith("353") || clean.startsWith("356") -> "RUPAY"
-                                        else -> cardType
+                                    val effectiveExistingBank = if (bankOrIssuer == lastAutoFilledBank && lastAutoFilledBank.isNotBlank()) {
+                                        ""
+                                    } else {
+                                        bankOrIssuer
+                                    }
+                                    val merged = CardBinLookupEngine.resolveWithNfcPrecedence(
+                                        existingNetwork = cardType,
+                                        existingBank = effectiveExistingBank,
+                                        rawCardNumber = clean,
+                                        isFromNfc = true
+                                    )
+                                    if (!hasUserSelectedNetwork && merged.filledNetworkFromBin) {
+                                        cardType = merged.network
+                                    }
+                                    if (!hasUserEditedBank) {
+                                        if (merged.filledBankFromBin) {
+                                            bankOrIssuer = merged.bankOrIssuer
+                                            lastAutoFilledBank = merged.bankOrIssuer
+                                        } else if (bankOrIssuer == lastAutoFilledBank && lastAutoFilledBank.isNotBlank() && effectiveExistingBank.isBlank()) {
+                                            bankOrIssuer = ""
+                                            lastAutoFilledBank = ""
+                                        }
                                     }
                                 },
                                 label = { Text("Card Number") },
                                 placeholder = { Text("16-digit card number") },
                                 visualTransformation = PaymentCardVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("nfc_card_number_input"),
                                 shape = MaterialTheme.shapes.medium,
                                 singleLine = true
                             )
+
+                            val liveBinResult = remember(rawCardNumber) { CardBinLookupEngine.lookup(rawCardNumber) }
+                            if (rawCardNumber.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                BinDetectionBanner(
+                                    lookupResult = liveBinResult,
+                                    isNfcOrigin = true
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(10.dp))
 
@@ -435,28 +484,25 @@ fun NfcScanScreen(
                                         .horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    listOf(
-                                        "VISA" to "Visa",
-                                        "MASTERCARD" to "Mastercard",
-                                        "DINERS" to "Diners Club",
-                                        "AMEX" to "AMEX",
-                                        "RUPAY" to "RuPay"
-                                    ).forEach { (netKey, netLabel) ->
-                                        val isSelected = cardType.equals(netKey, ignoreCase = true) || (netKey == "DINERS" && cardType.uppercase().contains("DINER"))
+                                    PaymentNetwork.entries.forEach { net ->
+                                        val isSelected = cardType.equals(net.key, ignoreCase = true) ||
+                                            (net == PaymentNetwork.DINERS && cardType.uppercase().contains("DINER"))
                                         FilterChip(
                                             selected = isSelected,
                                             onClick = {
                                                 haptics?.cardSelect()
-                                                cardType = netKey
+                                                cardType = net.key
+                                                hasUserSelectedNetwork = true
                                             },
                                             label = {
                                                 Text(
-                                                    text = netLabel,
+                                                    text = net.displayName,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                                 )
                                             },
+                                            modifier = Modifier.testTag("nfc_network_chip_${net.key.lowercase()}"),
                                             shape = MaterialTheme.shapes.medium,
                                             colors = FilterChipDefaults.filterChipColors(
                                                 selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -517,9 +563,14 @@ fun NfcScanScreen(
 
                             OutlinedTextField(
                                 value = bankOrIssuer,
-                                onValueChange = { bankOrIssuer = it },
+                                onValueChange = { input ->
+                                    bankOrIssuer = input
+                                    hasUserEditedBank = input.isNotBlank()
+                                },
                                 label = { Text("Bank / Issuer") },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("nfc_bank_issuer_input"),
                                 shape = MaterialTheme.shapes.medium,
                                 singleLine = true
                             )
