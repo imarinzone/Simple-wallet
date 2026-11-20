@@ -6,122 +6,111 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 1. Ambient Drop Shadow under Circle -->
-    <path
-        android:fillAlpha="0.22"
-        android:fillColor="#000000"
-        android:pathData="M26,55.5 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" />
+    <!--
+        Material 3 Expressive frameless dual-card emblem, optically centered
+        with generous breathing room inside the 66dp safe zone for all Android 16
+        expressive shapes (Circle, Squircle, 4/7-sided Cookie, Arch, Clover) and parallax.
+    -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.85"
+        android:scaleY="0.85"
+        android:translateY="0.6">
 
-    <!-- 2. The Clean White Circle Container -->
-    <path android:pathData="M26,54 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:angle="270"
-                android:startColor="#FFFFFF"
-                android:endColor="#F8FAFC"
-                android:type="linear" />
-        </aapt:attr>
-    </path>
+        <!-- Back Stacked Card (Warm Expressive Gold peeking behind front card) -->
+        <path android:pathData="M38.5,31 H69.5 A5.5,5.5 0 0,1 75,36.5 V48 A3,3 0 0,1 72,51 H36 A3,3 0 0,1 33,48 V36.5 A5.5,5.5 0 0,1 38.5,31 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:endX="75"
+                    android:endY="48"
+                    android:startX="33"
+                    android:startY="31"
+                    android:type="linear">
+                    <item
+                        android:color="#FDE047"
+                        android:offset="0.0" />
+                    <item
+                        android:color="#F59E0B"
+                        android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
 
-    <!-- Circle Crisp Rim Border -->
-    <path
-        android:strokeColor="#E2E8F0"
-        android:strokeWidth="0.8"
-        android:pathData="M26,54 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0 Z" />
+        <!-- Subtle Separation Shadow Between Back Card and Front Card -->
+        <path
+            android:fillAlpha="0.16"
+            android:fillColor="#0F172A"
+            android:pathData="M33,39.5 H75 V43 H33 Z" />
 
-    <!-- 3. Card Drop Shadow on White Circle -->
-    <path
-        android:fillAlpha="0.16"
-        android:fillColor="#0F172A"
-        android:pathData="M40.5,44.5 h27 c1.93,0 3.5,1.57 3.5,3.5 v15 c0,1.93 -1.57,3.5 -3.5,3.5 h-27 c-1.93,0 -3.5,-1.57 -3.5,-3.5 v-15 c0,-1.93 1.57,-3.5 3.5,-3.5 z" />
+        <!-- Primary Front Card Body (Luminous Crisp White-to-Ice Card) -->
+        <path android:pathData="M33.5,41.5 H74.5 A6.5,6.5 0 0,1 81,48 V69 A6.5,6.5 0 0,1 74.5,75.5 H33.5 A6.5,6.5 0 0,1 27,69 V48 A6.5,6.5 0 0,1 33.5,41.5 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:endX="81"
+                    android:endY="75.5"
+                    android:startX="27"
+                    android:startY="41.5"
+                    android:type="linear">
+                    <item
+                        android:color="#FFFFFF"
+                        android:offset="0.0" />
+                    <item
+                        android:color="#EFF6FF"
+                        android:offset="0.65" />
+                    <item
+                        android:color="#DBEAFE"
+                        android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
 
-    <!-- 4. Modern Credit Card Body (Vibrant Royal Indigo Gradient) -->
-    <path android:pathData="M40.5,43 h27 c1.93,0 3.5,1.57 3.5,3.5 v15 c0,1.93 -1.57,3.5 -3.5,3.5 h-27 c-1.93,0 -3.5,-1.57 -3.5,-3.5 v-15 c0,-1.93 1.57,-3.5 3.5,-3.5 z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:angle="315"
-                android:startColor="#1E3A8A"
-                android:centerColor="#2563EB"
-                android:endColor="#3B82F6"
-                android:type="linear" />
-        </aapt:attr>
-    </path>
+        <!-- EMV Smart Chip (Bold Rounded Pill with Warm Metallic Gold Gradient) -->
+        <path android:pathData="M36.2,48.5 H42.8 A2.2,2.2 0 0,1 45,50.7 V54.3 A2.2,2.2 0 0,1 42.8,56.5 H36.2 A2.2,2.2 0 0,1 34,54.3 V50.7 A2.2,2.2 0 0,1 36.2,48.5 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:endX="45"
+                    android:endY="56.5"
+                    android:startX="34"
+                    android:startY="48.5"
+                    android:type="linear">
+                    <item
+                        android:color="#FCD34D"
+                        android:offset="0.0" />
+                    <item
+                        android:color="#D97706"
+                        android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
 
-    <!-- Card Edge Highlight Rim -->
-    <path
-        android:strokeColor="#93C5FD"
-        android:strokeAlpha="0.65"
-        android:strokeWidth="0.6"
-        android:pathData="M40.5,43 h27 c1.93,0 3.5,1.57 3.5,3.5 v15 c0,1.93 -1.57,3.5 -3.5,3.5 h-27 c-1.93,0 -3.5,-1.57 -3.5,-3.5 v-15 c0,-1.93 1.57,-3.5 3.5,-3.5 z" />
+        <!-- EMV Chip Contact Lines -->
+        <path
+            android:pathData="M39.5,48.5 V56.5 M34,52.5 H45"
+            android:strokeAlpha="0.5"
+            android:strokeColor="#78350F"
+            android:strokeWidth="0.85" />
 
-    <!-- Card Top Sheen Accent -->
-    <path
-        android:fillAlpha="0.14"
-        android:fillColor="#FFFFFF"
-        android:pathData="M40.5,43 h27 c1.93,0 3.5,1.57 3.5,3.5 v4 h-34 v-4 c0,-1.93 1.57,-3.5 3.5,-3.5 z" />
+        <!-- Contactless NFC Waves (Bold Expressive Cobalt Arcs) -->
+        <path
+            android:fillColor="#2563EB"
+            android:pathData="M67.13,47.78 A7.35,7.35 0 0,1 67.13,57.22 A1.15,1.15 0 0,1 65.37,55.75 A5.05,5.05 0 0,0 65.37,49.25 A1.15,1.15 0 0,1 67.13,47.78 Z" />
+        <path
+            android:fillColor="#3B82F6"
+            android:pathData="M70.50,44.95 A11.75,11.75 0 0,1 70.50,60.05 A1.15,1.15 0 0,1 68.74,58.57 A9.45,9.45 0 0,0 68.74,46.43 A1.15,1.15 0 0,1 70.50,44.95 Z" />
 
-    <!-- 5. Golden EMV Smart Chip -->
-    <path android:pathData="M42.2,47.5 h4.6 c0.6,0 1,0.4 1,1 v3 c0,0.6 -0.4,1 -1,1 h-4.6 c-0.6,0 -1,-0.4 -1,-1 v-3 c0,-0.6 0.4,-1 1,-1 z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:angle="315"
-                android:startColor="#FDE68A"
-                android:centerColor="#F59E0B"
-                android:endColor="#D97706"
-                android:type="linear" />
-        </aapt:attr>
-    </path>
-    <!-- EMV Chip Pin Dividers -->
-    <path
-        android:strokeColor="#78350F"
-        android:strokeWidth="0.4"
-        android:pathData="M44.5,47.5 v5 M41.2,50 h6.6" />
+        <!-- Card Number Accent Pill Bar -->
+        <path
+            android:fillColor="#1E40AF"
+            android:pathData="M36.1,64.5 H54.4 A2.1,2.1 0 0,1 56.5,66.6 A2.1,2.1 0 0,1 54.4,68.7 H36.1 A2.1,2.1 0 0,1 34,66.6 A2.1,2.1 0 0,1 36.1,64.5 Z" />
 
-    <!-- 6. Contactless Wave Radians (NFC) -->
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="0.8"
-        android:strokeAlpha="0.9"
-        android:strokeLineCap="round"
-        android:pathData="M49.5,49 c0.6,0.6 0.6,1.8 0,2.4" />
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="0.8"
-        android:strokeAlpha="0.9"
-        android:strokeLineCap="round"
-        android:pathData="M51.2,47.8 c1.2,1.2 1.2,3.6 0,4.8" />
-    <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="0.8"
-        android:strokeAlpha="0.75"
-        android:strokeLineCap="round"
-        android:pathData="M53,46.5 c1.9,1.9 1.9,5.5 0,7.4" />
-
-    <!-- 7. Embossed Minimal Card Number Lines -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.9"
-        android:pathData="M41.5,56 h16 c0.4,0 0.8,0.35 0.8,0.75 s-0.4,0.75 -0.8,0.75 h-16 c-0.4,0 -0.8,-0.35 -0.8,-0.75 s0.4,-0.75 0.8,-0.75 z" />
-    <path
-        android:fillColor="#93C5FD"
-        android:fillAlpha="0.85"
-        android:pathData="M41.5,59.5 h8.5 c0.35,0 0.7,0.3 0.7,0.65 s-0.35,0.65 -0.7,0.65 h-8.5 c-0.35,0 -0.7,-0.3 -0.7,-0.65 s0.35,-0.65 0.7,-0.65 z" />
-    <path
-        android:fillColor="#93C5FD"
-        android:fillAlpha="0.85"
-        android:pathData="M52,59.5 h4.5 c0.35,0 0.7,0.3 0.7,0.65 s-0.35,0.65 -0.7,0.65 h-4.5 c-0.35,0 -0.7,-0.3 -0.7,-0.65 s0.35,-0.65 0.7,-0.65 z" />
-
-    <!-- 8. Payment Network Overlapping Discs (Bottom-Right) -->
-    <path
-        android:fillAlpha="0.95"
-        android:fillColor="#EF4444"
-        android:pathData="M63.5,59.5 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" />
-    <path
-        android:fillAlpha="0.9"
-        android:fillColor="#FBBF24"
-        android:pathData="M66.8,59.5 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" />
-    <path
-        android:fillAlpha="0.95"
-        android:fillColor="#F97316"
-        android:pathData="M65.15,57.5 a2.5,2.5 0 0,0 0,4 a2.5,2.5 0 0,0 0,-4 z" />
+        <!-- Payment Network Overlapping Discs -->
+        <path
+            android:fillColor="#EF4444"
+            android:pathData="M66.8,66.6 m-3.4,0 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0" />
+        <path
+            android:fillAlpha="0.92"
+            android:fillColor="#F59E0B"
+            android:pathData="M71.0,66.6 m-3.4,0 a3.4,3.4 0 1,0 6.8,0 a3.4,3.4 0 1,0 -6.8,0" />
+    </group>
 </vector>

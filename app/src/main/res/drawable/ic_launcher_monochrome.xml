@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!--
+        Dedicated Material You / Material 3 Expressive monochrome layer.
+        Pure single-color alpha silhouette with true evenOdd negative-space cutouts,
+        optically scaled inside the safe zone to match Pixel / Material 3 Expressive themed icons.
+    -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.85"
+        android:scaleY="0.85"
+        android:translateY="0.6">
+
+        <!-- Back Stacked Card Peek Tab (separated by crisp transparent gap from front card) -->
+        <path
+            android:fillColor="#000000"
+            android:pathData="M39,31 H69 A5,5 0 0,1 74,36 V37.3 A1.5,1.5 0 0,1 72.5,38.8 H35.5 A1.5,1.5 0 0,1 34,37.3 V36 A5,5 0 0,1 39,31 Z" />
+
+        <!-- Front Card Body with True Negative-Space Cutouts (Chip, NFC Waves, Number Bar, Network Pill) -->
+        <path
+            android:fillColor="#000000"
+            android:fillType="evenOdd"
+            android:pathData="M33.5,41.5 H74.5 A6.5,6.5 0 0,1 81,48 V69 A6.5,6.5 0 0,1 74.5,75.5 H33.5 A6.5,6.5 0 0,1 27,69 V48 A6.5,6.5 0 0,1 33.5,41.5 Z M36.2,48.5 H42.8 A2.2,2.2 0 0,1 45,50.7 V54.3 A2.2,2.2 0 0,1 42.8,56.5 H36.2 A2.2,2.2 0 0,1 34,54.3 V50.7 A2.2,2.2 0 0,1 36.2,48.5 Z M67.13,47.78 A7.35,7.35 0 0,1 67.13,57.22 A1.15,1.15 0 0,1 65.37,55.75 A5.05,5.05 0 0,0 65.37,49.25 A1.15,1.15 0 0,1 67.13,47.78 Z M70.50,44.95 A11.75,11.75 0 0,1 70.50,60.05 A1.15,1.15 0 0,1 68.74,58.57 A9.45,9.45 0 0,0 68.74,46.43 A1.15,1.15 0 0,1 70.50,44.95 Z M36.1,64.5 H54.4 A2.1,2.1 0 0,1 56.5,66.6 A2.1,2.1 0 0,1 54.4,68.7 H36.1 A2.1,2.1 0 0,1 34,66.6 A2.1,2.1 0 0,1 36.1,64.5 Z M66.1,64.5 H71.9 A2.1,2.1 0 0,1 74,66.6 A2.1,2.1 0 0,1 71.9,68.7 H66.1 A2.1,2.1 0 0,1 64,66.6 A2.1,2.1 0 0,1 66.1,64.5 Z" />
+    </group>
+</vector>
