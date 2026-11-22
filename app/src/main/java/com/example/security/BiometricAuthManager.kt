@@ -26,7 +26,7 @@ object BiometricAuthManager {
 
     fun promptBiometric(
         activity: FragmentActivity,
-        title: String = "Unlock VaultFolio",
+        title: String = "Unlock Simple Wallet",
         subtitle: String = "Use fingerprint, face, or lock screen credentials to access your cards",
         onSuccess: () -> Unit,
         onError: (String) -> Unit

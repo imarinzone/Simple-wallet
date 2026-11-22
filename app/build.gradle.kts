@@ -16,9 +16,9 @@ fun computeSemverVersionCode(versionName: String): Int {
     .split(".", "-", "_")
     .mapNotNull { it.toIntOrNull() }
   val major = parts.getOrElse(0) { 1 }.coerceAtLeast(1)
-  val minor = parts.getOrElse(1) { 1 }.coerceIn(0, 99)
+  val minor = parts.getOrElse(1) { 2 }.coerceIn(0, 99)
   val patch = parts.getOrElse(2) { 0 }.coerceIn(0, 9999)
-  return (major * 1_000_000 + minor * 10_000 + patch).coerceAtLeast(1_010_000)
+  return (major * 1_000_000 + minor * 10_000 + patch).coerceAtLeast(1_020_000)
 }
 
 android {
@@ -34,15 +34,15 @@ android {
     )
     .orElse(
       providers.environmentVariable("GITHUB_RUN_NUMBER")
-        .map { "1.1.$it" }
+        .map { "1.2.$it" }
     )
-    .getOrElse("1.1.0")
+    .getOrElse("1.2.0")
 
   val semverVersionCode = computeSemverVersionCode(envVersionName)
   val runNumberOffset = providers.environmentVariable("GITHUB_RUN_NUMBER")
     .map { it.toIntOrNull() ?: 0 }
     .getOrElse(0)
-  val minUpgradeVersionCode = maxOf(semverVersionCode, 1_010_000 + runNumberOffset)
+  val minUpgradeVersionCode = maxOf(semverVersionCode, 1_020_000 + runNumberOffset)
 
   val envVersionCode = providers.environmentVariable("VERSION_CODE")
     .orElse(providers.gradleProperty("versionCode"))

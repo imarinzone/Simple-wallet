@@ -50,10 +50,10 @@ class WalletRepository(private val cardDao: CardDao) {
     /**
      * Builds raw cards JSON.
      */
-    fun buildRawCardsJson(cards: List<CardEntity>, backupName: String = "VaultFolio Backup"): String {
+    fun buildRawCardsJson(cards: List<CardEntity>, backupName: String = "Simple Wallet Backup"): String {
         val root = JSONObject()
         root.put("version", 2)
-        root.put("app", "VaultFolio")
+        root.put("app", "Simple Wallet")
         root.put("backupName", backupName)
         root.put("exportedAt", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()))
         root.put("cardCount", cards.size)
@@ -89,7 +89,7 @@ class WalletRepository(private val cardDao: CardDao) {
     suspend fun exportEncryptedBackupJson(
         cards: List<CardEntity>,
         passphrase: String,
-        backupName: String = "VaultFolio Backup"
+        backupName: String = "Simple Wallet Backup"
     ): String = withContext(Dispatchers.IO) {
         val rawJson = buildRawCardsJson(cards, backupName)
         if (passphrase.isBlank()) {
@@ -114,7 +114,7 @@ class WalletRepository(private val cardDao: CardDao) {
 
         val encryptedRoot = JSONObject()
         encryptedRoot.put("version", 2)
-        encryptedRoot.put("app", "VaultFolio")
+        encryptedRoot.put("app", "Simple Wallet")
         encryptedRoot.put("encrypted", true)
         encryptedRoot.put("salt", Base64.encodeToString(salt, Base64.NO_WRAP))
         encryptedRoot.put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
@@ -175,7 +175,7 @@ class WalletRepository(private val cardDao: CardDao) {
     private suspend fun restoreRawCardsJson(jsonString: String, replaceExisting: Boolean): Result<Int> {
         val root = JSONObject(jsonString)
         if (!root.has("cards")) {
-            return Result.failure(IllegalArgumentException("Invalid VaultFolio backup format"))
+            return Result.failure(IllegalArgumentException("Invalid Simple Wallet backup format"))
         }
 
         if (replaceExisting) {
@@ -211,7 +211,7 @@ class WalletRepository(private val cardDao: CardDao) {
         return Result.success(restoredCards.size)
     }
 
-    suspend fun exportBackupJson(cards: List<CardEntity>, backupName: String = "VaultFolio Backup"): String = withContext(Dispatchers.IO) {
+    suspend fun exportBackupJson(cards: List<CardEntity>, backupName: String = "Simple Wallet Backup"): String = withContext(Dispatchers.IO) {
         buildRawCardsJson(cards, backupName)
     }
 

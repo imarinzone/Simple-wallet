@@ -75,7 +75,7 @@ import com.example.ui.screens.ScanCardScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SyncBackupScreen
 import com.example.ui.screens.ThemeMode
-import com.example.ui.theme.VaultFolioTheme
+import com.example.ui.theme.SimpleWalletTheme
 
 
 class MainActivity : FragmentActivity() {
@@ -99,7 +99,7 @@ class MainActivity : FragmentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
 
-            VaultFolioTheme(
+            SimpleWalletTheme(
                 darkTheme = isDarkTheme,
                 accentColor = pixelAccent
             ) {
@@ -211,7 +211,7 @@ fun MainAppContent(
                 onTriggerSystemBiometric = {
                     BiometricAuthManager.promptBiometric(
                         activity = activity,
-                        title = "Unlock VaultFolio",
+                        title = "Unlock Simple Wallet",
                         subtitle = "Verify fingerprint or device credentials to view your cards",
                         onSuccess = {
                             haptics?.success()

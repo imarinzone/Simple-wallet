@@ -542,7 +542,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Current version: v${AppUpdateService.CURRENT_VERSION_NAME}",
+                                text = "Current version: v${AppUpdateService.CURRENT_VERSION_NAME} (code ${AppUpdateService.CURRENT_VERSION_CODE})",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

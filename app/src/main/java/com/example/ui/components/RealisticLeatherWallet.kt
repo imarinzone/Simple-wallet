@@ -341,7 +341,7 @@ private fun ClosedWalletView(
                 // Bottom Branding & Card Counter
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "VAULTFOLIO",
+                        text = "SIMPLE WALLET",
                         color = leatherFinish.hardwareColor,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,

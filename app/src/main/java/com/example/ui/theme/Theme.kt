@@ -25,7 +25,7 @@ enum class PixelAccentColor(val label: String, val hex: String, val isDynamic: B
     ROSE("Blossom Rose", "#F472B6")
 }
 
-val VaultFolioShapes = Shapes(
+val SimpleWalletShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(16.dp),
@@ -161,7 +161,7 @@ fun getPixelColorScheme(darkTheme: Boolean, accent: PixelAccentColor): ColorSche
 }
 
 @Composable
-fun VaultFolioTheme(
+fun SimpleWalletTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     accentColor: PixelAccentColor = PixelAccentColor.BLUE,
     content: @Composable () -> Unit
@@ -177,7 +177,7 @@ fun VaultFolioTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = VaultFolioShapes,
+        shapes = SimpleWalletShapes,
         content = content
     )
 }

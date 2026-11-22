@@ -59,11 +59,17 @@ jobs:
             tr -d '[:space:]' < debug.keystore.base64 | base64 -d > debug.keystore
           fi
 
-          # Verify decoded keystore integrity; only generate fallback if no valid keystore exists
-          if ! keytool -list -keystore debug.keystore -storepass android >/dev/null 2>&1; then
-            echo "Warning: debug.keystore missing or invalid, generating fallback keystore"
-            rm -f debug.keystore
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          # Verify persistent keystore integrity; never silently generate a random keystore
+          # because a different signing certificate permanently breaks in-place APK upgrades.
+          if [ -f my-upload-key.jks ] && [ -n "$STORE_PASSWORD" ]; then
+            echo "Using custom upload keystore from GitHub Secrets (my-upload-key.jks)"
+            keytool -list -keystore my-upload-key.jks -storepass "$STORE_PASSWORD" >/dev/null
+          elif keytool -list -keystore debug.keystore -storepass android >/dev/null 2>&1; then
+            echo "Using persistent repository keystore (debug.keystore decoded from debug.keystore.base64)"
+          else
+            echo "Error: No valid persistent signing keystore found (my-upload-key.jks or debug.keystore.base64)." >&2
+            echo "Refusing to generate a random fallback keystore because that would break in-place updates." >&2
+            exit 1
           fi
 
       - name: Run Unit & Robolectric Tests
@@ -81,7 +87,7 @@ jobs:
         id: versioning
         run: |
           RUN_NUM="${{ github.run_number }}"
-          MIN_CODE=$(( 1010000 + RUN_NUM ))
+          MIN_CODE=$(( 1020000 + RUN_NUM ))
 
           if [ "${{ github.event_name }}" = "release" ] && [ -n "${{ github.event.release.tag_name }}" ]; then
             RAW_TAG="${{ github.event.release.tag_name }}"
@@ -89,7 +95,7 @@ jobs:
             V_NAME="${V_NAME#V}"
             IFS='.-_' read -r MAJOR MINOR PATCH _ <<< "$V_NAME"
             MAJOR=${MAJOR:-1}
-            MINOR=${MINOR:-1}
+            MINOR=${MINOR:-2}
             PATCH=${PATCH:-0}
             if [[ "$MAJOR" =~ ^[0-9]+$ ]] && [[ "$MINOR" =~ ^[0-9]+$ ]] && [[ "$PATCH" =~ ^[0-9]+$ ]]; then
               TAG_CODE=$(( MAJOR * 1000000 + MINOR * 10000 + PATCH ))
@@ -102,7 +108,7 @@ jobs:
               V_CODE=$MIN_CODE
             fi
           else
-            V_NAME="1.1.${RUN_NUM}"
+            V_NAME="1.2.${RUN_NUM}"
             V_CODE=$MIN_CODE
           fi
 
@@ -131,21 +137,26 @@ jobs:
             exit 1
           fi
 
-          # Verify APK signature with Android SDK apksigner if available
+          # Verify APK package metadata & signature with Android SDK tools
+          AAPT2_BIN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name aapt2 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$AAPT2_BIN" ]; then
+            "$AAPT2_BIN" dump badging "$RELEASE_APK" | head -n 5
+          fi
+
           APKSIGNER_BIN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)
           if [ -n "$APKSIGNER_BIN" ]; then
             "$APKSIGNER_BIN" verify -v --print-certs "$RELEASE_APK"
           fi
 
           # Publish only signed release APK so users never mix debug and release builds
-          cp "$RELEASE_APK" "release-apks/VaultFolio-release.apk"
+          cp "$RELEASE_APK" "release-apks/SimpleWallet-release.apk"
           echo "Generated signed release APK in release-apks:"
           ls -lh release-apks/
 
       - name: Upload Release APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VaultFolio-Release-APK
+          name: SimpleWallet-Release-APK
           path: release-apks/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -155,7 +166,7 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apks/VaultFolio-release.apk
+          files: release-apks/SimpleWallet-release.apk
           tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || format('v{0}', steps.versioning.outputs.version_name) }}
           name: ${{ github.event_name == 'release' && github.event.release.name || format('Release v{0}', steps.versioning.outputs.version_name) }}
           generate_release_notes: true

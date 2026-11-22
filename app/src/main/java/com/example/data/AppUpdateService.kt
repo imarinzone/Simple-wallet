@@ -36,8 +36,8 @@ object AppUpdateService {
     const val GITHUB_RELEASES_PAGE_URL = "https://github.com/imarinzone/Simple-wallet/releases"
     private const val GITHUB_API_LATEST_RELEASE_URL = "https://api.github.com/repos/imarinzone/Simple-wallet/releases/latest"
 
-    const val DEFAULT_VERSION_NAME = "1.1.0"
-    const val DEFAULT_VERSION_CODE = 1_010_000
+    const val DEFAULT_VERSION_NAME = "1.2.0"
+    const val DEFAULT_VERSION_CODE = 1_020_000
 
     val CURRENT_VERSION_NAME: String
         get() = try {
@@ -199,7 +199,7 @@ object AppUpdateService {
             .split(".", "-", "_")
             .mapNotNull { it.toIntOrNull() }
         val major = parts.getOrElse(0) { 1 }.coerceAtLeast(1)
-        val minor = parts.getOrElse(1) { 1 }.coerceIn(0, 99)
+        val minor = parts.getOrElse(1) { 2 }.coerceIn(0, 99)
         val patch = parts.getOrElse(2) { 0 }.coerceIn(0, 9999)
         return major * 1_000_000 + minor * 10_000 + patch
     }
@@ -234,7 +234,7 @@ object AppUpdateService {
             lines.take(6)
         } else {
             listOf(
-                "Simple-wallet release $tagName",
+                "Simple Wallet release $tagName",
                 "Bug fixes, performance improvements, and stability enhancements",
                 "Full changelog available at $GITHUB_RELEASES_PAGE_URL"
             )
