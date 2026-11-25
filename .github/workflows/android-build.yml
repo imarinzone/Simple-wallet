@@ -149,14 +149,14 @@ jobs:
           fi
 
           # Publish only signed release APK so users never mix debug and release builds
-          cp "$RELEASE_APK" "release-apks/SimpleWallet-release.apk"
+          cp "$RELEASE_APK" "release-apks/OneWallet-release.apk"
           echo "Generated signed release APK in release-apks:"
           ls -lh release-apks/
 
       - name: Upload Release APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SimpleWallet-Release-APK
+          name: OneWallet-Release-APK
           path: release-apks/*.apk
           if-no-files-found: error
           retention-days: 30
@@ -166,7 +166,7 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apks/SimpleWallet-release.apk
+          files: release-apks/OneWallet-release.apk
           tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || format('v{0}', steps.versioning.outputs.version_name) }}
           name: ${{ github.event_name == 'release' && github.event.release.name || format('Release v{0}', steps.versioning.outputs.version_name) }}
           generate_release_notes: true

@@ -22,7 +22,7 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Simple Wallet"
+rootProject.name = "One Wallet"
 
 
 include(":app")

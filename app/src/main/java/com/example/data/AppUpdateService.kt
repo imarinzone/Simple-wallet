@@ -71,7 +71,7 @@ object AppUpdateService {
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 setRequestProperty("Accept", "application/vnd.github.v3+json")
-                setRequestProperty("User-Agent", "Simple-Wallet-Android-App")
+                setRequestProperty("User-Agent", "One-Wallet-Android-App")
                 connectTimeout = 7000
                 readTimeout = 7000
             }
@@ -159,7 +159,7 @@ object AppUpdateService {
             latestVersionCode = parseVersionCode(fallbackLatestVersion),
             releaseDate = "October 2026",
             releaseNotes = listOf(
-                "Simple Wallet latest release v$fallbackLatestVersion from GitHub",
+                "One Wallet latest release v$fallbackLatestVersion from GitHub",
                 "Official APK releases available at github.com/imarinzone/Simple-wallet",
                 "Enhanced 3D card tilt, rotating Google Pixel clock widget add border, and security upgrades"
             ),
@@ -234,7 +234,7 @@ object AppUpdateService {
             lines.take(6)
         } else {
             listOf(
-                "Simple Wallet release $tagName",
+                "One Wallet release $tagName",
                 "Bug fixes, performance improvements, and stability enhancements",
                 "Full changelog available at $GITHUB_RELEASES_PAGE_URL"
             )

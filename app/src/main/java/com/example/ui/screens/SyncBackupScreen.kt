@@ -301,7 +301,7 @@ fun SyncBackupScreen(
                         value = importInputText,
                         onValueChange = { importInputText = it },
                         label = { Text("Backup Payload") },
-                        placeholder = { Text("Paste encrypted Simple Wallet JSON code here") },
+                        placeholder = { Text("Paste encrypted One Wallet JSON code here") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(110.dp),

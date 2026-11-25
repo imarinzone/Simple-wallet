@@ -75,7 +75,7 @@ import com.example.ui.screens.ScanCardScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SyncBackupScreen
 import com.example.ui.screens.ThemeMode
-import com.example.ui.theme.SimpleWalletTheme
+import com.example.ui.theme.OneWalletTheme
 
 
 class MainActivity : FragmentActivity() {
@@ -99,7 +99,7 @@ class MainActivity : FragmentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
 
-            SimpleWalletTheme(
+            OneWalletTheme(
                 darkTheme = isDarkTheme,
                 accentColor = pixelAccent
             ) {
@@ -211,7 +211,7 @@ fun MainAppContent(
                 onTriggerSystemBiometric = {
                     BiometricAuthManager.promptBiometric(
                         activity = activity,
-                        title = "Unlock Simple Wallet",
+                        title = "Unlock One Wallet",
                         subtitle = "Verify fingerprint or device credentials to view your cards",
                         onSuccess = {
                             haptics?.success()
@@ -508,7 +508,7 @@ fun MainAppContent(
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
-                                text = "Simple Wallet v${update.latestVersionName} is now ready to download (Current: v${update.currentVersionName}).",
+                                text = "One Wallet v${update.latestVersionName} is now ready to download (Current: v${update.currentVersionName}).",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 14.sp
                             )

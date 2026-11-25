@@ -179,7 +179,7 @@ fun BiometricLockOverlay(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "Simple Wallet Locked",
+                    text = "One Wallet Locked",
                     color = MaterialTheme.colorScheme.onBackground,
                     style = MaterialTheme.typography.headlineSmall
                 )
