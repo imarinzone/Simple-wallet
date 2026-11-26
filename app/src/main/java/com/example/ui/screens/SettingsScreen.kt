@@ -548,7 +548,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(1.dp))
                             Text(
-                                text = "github.com/imarinzone/Simple-wallet/releases",
+                                text = "github.com/imarinzone/One-wallet/releases",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary
                             )

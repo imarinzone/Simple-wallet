@@ -26,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "vault_folio.db"
+                    "one_wallet.db"
                 )
                     .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration(true)

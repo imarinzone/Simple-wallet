@@ -50,7 +50,7 @@ android {
     .getOrElse(minUpgradeVersionCode)
 
   defaultConfig {
-    applicationId = "com.aistudio.vaultfolio.kxpzql"
+    applicationId = "com.aistudio.onewallet.kxpzql"
     minSdk = 24
     targetSdk = 36
     versionCode = envVersionCode

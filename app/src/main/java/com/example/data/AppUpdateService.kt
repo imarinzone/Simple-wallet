@@ -32,9 +32,9 @@ object AppUpdateService {
     private const val TAG = "AppUpdateService"
 
     // Real GitHub Repository Releases
-    const val GITHUB_REPO_URL = "https://github.com/imarinzone/Simple-wallet"
-    const val GITHUB_RELEASES_PAGE_URL = "https://github.com/imarinzone/Simple-wallet/releases"
-    private const val GITHUB_API_LATEST_RELEASE_URL = "https://api.github.com/repos/imarinzone/Simple-wallet/releases/latest"
+    const val GITHUB_REPO_URL = "https://github.com/imarinzone/One-wallet"
+    const val GITHUB_RELEASES_PAGE_URL = "https://github.com/imarinzone/One-wallet/releases"
+    private const val GITHUB_API_LATEST_RELEASE_URL = "https://api.github.com/repos/imarinzone/One-wallet/releases/latest"
 
     const val DEFAULT_VERSION_NAME = "1.2.0"
     const val DEFAULT_VERSION_CODE = 1_020_000
@@ -58,7 +58,7 @@ object AppUpdateService {
     const val DEFAULT_DOWNLOAD_URL = GITHUB_RELEASES_PAGE_URL
 
     /**
-     * Checks if a new release is available from https://github.com/imarinzone/Simple-wallet/releases.
+     * Checks if a new release is available from https://github.com/imarinzone/One-wallet/releases.
      * Compares the latest release tag with the app's current version.
      */
     suspend fun checkForUpdates(
@@ -146,7 +146,7 @@ object AppUpdateService {
             Log.w(TAG, "Error checking updates from GitHub API: ${e.message}")
         }
 
-        // Graceful Fallback for imarinzone/Simple-wallet
+        // Graceful Fallback for imarinzone/One-wallet
         val fallbackLatestVersion = DEFAULT_VERSION_NAME
         val isNewer = isVersionNewer(fallbackLatestVersion, currentVersionName)
         val isAvailable = forceAvailableForTest ?: isNewer
@@ -160,7 +160,7 @@ object AppUpdateService {
             releaseDate = "October 2026",
             releaseNotes = listOf(
                 "One Wallet latest release v$fallbackLatestVersion from GitHub",
-                "Official APK releases available at github.com/imarinzone/Simple-wallet",
+                "Official APK releases available at github.com/imarinzone/One-wallet",
                 "Enhanced 3D card tilt, rotating Google Pixel clock widget add border, and security upgrades"
             ),
             downloadUrl = GITHUB_RELEASES_PAGE_URL,
