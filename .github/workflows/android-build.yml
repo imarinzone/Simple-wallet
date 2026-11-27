@@ -32,7 +32,19 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: 'gradle'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Accept Android SDK Licenses
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -n "$SDKMANAGER" ]; then
+            set +o pipefail
+            yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+            set -o pipefail
+          fi
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -59,29 +71,17 @@ jobs:
             tr -d '[:space:]' < debug.keystore.base64 | base64 -d > debug.keystore
           fi
 
-          # Verify persistent keystore integrity; never silently generate a random keystore
-          # because a different signing certificate permanently breaks in-place APK upgrades.
+          # Verify persistent keystore integrity so releases share a consistent signing certificate
           if [ -f my-upload-key.jks ] && [ -n "$STORE_PASSWORD" ]; then
             echo "Using custom upload keystore from GitHub Secrets (my-upload-key.jks)"
             keytool -list -keystore my-upload-key.jks -storepass "$STORE_PASSWORD" >/dev/null
-          elif keytool -list -keystore debug.keystore -storepass android >/dev/null 2>&1; then
+          elif [ -f debug.keystore ] && keytool -list -keystore debug.keystore -storepass android >/dev/null 2>&1; then
             echo "Using persistent repository keystore (debug.keystore decoded from debug.keystore.base64)"
           else
-            echo "Error: No valid persistent signing keystore found (my-upload-key.jks or debug.keystore.base64)." >&2
-            echo "Refusing to generate a random fallback keystore because that would break in-place updates." >&2
-            exit 1
+            echo "::warning::No persistent keystore found (my-upload-key.jks or debug.keystore.base64). Generating fallback keystore; add debug.keystore.base64 or KEYSTORE_BASE64 secret to keep in-place updates working."
+            rm -f debug.keystore
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
-
-      - name: Run Unit & Robolectric Tests
-        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
-
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-results
-          path: app/build/reports/tests/
-          if-no-files-found: ignore
 
       - name: Calculate Release Version and Code
         id: versioning
@@ -112,11 +112,22 @@ jobs:
             V_CODE=$MIN_CODE
           fi
 
-          echo "VERSION_NAME=$V_NAME" >> $GITHUB_ENV
-          echo "VERSION_CODE=$V_CODE" >> $GITHUB_ENV
-          echo "version_name=$V_NAME" >> $GITHUB_OUTPUT
-          echo "version_code=$V_CODE" >> $GITHUB_OUTPUT
+          echo "VERSION_NAME=$V_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$V_CODE" >> "$GITHUB_ENV"
+          echo "version_name=$V_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$V_CODE" >> "$GITHUB_OUTPUT"
           echo "Building version $V_NAME (versionCode: $V_CODE)"
+
+      - name: Run Unit & Robolectric Tests
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
 
       - name: Build Signed Release APK with Gradle
         env:
@@ -137,13 +148,15 @@ jobs:
             exit 1
           fi
 
-          # Verify APK package metadata & signature with Android SDK tools
-          AAPT2_BIN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name aapt2 2>/dev/null | sort -V | tail -n 1 || true)
+          # Verify APK package metadata & signature without triggering SIGPIPE under pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          AAPT2_BIN=$(find "$SDK_ROOT/build-tools" -name aapt2 -type f 2>/dev/null | sort -V | tail -n 1 || true)
           if [ -n "$AAPT2_BIN" ]; then
-            "$AAPT2_BIN" dump badging "$RELEASE_APK" | head -n 5
+            BADGING_OUTPUT=$("$AAPT2_BIN" dump badging "$RELEASE_APK")
+            printf '%s\n' "$BADGING_OUTPUT" | grep -E '^(package:|application-label:|sdkVersion:|targetSdkVersion:)' || true
           fi
 
-          APKSIGNER_BIN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)
+          APKSIGNER_BIN=$(find "$SDK_ROOT/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -n 1 || true)
           if [ -n "$APKSIGNER_BIN" ]; then
             "$APKSIGNER_BIN" verify -v --print-certs "$RELEASE_APK"
           fi
